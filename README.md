@@ -3,7 +3,7 @@ This repository contains the sources code of the app [Optimal experimental desig
 
 The source code is written in the R programming language. Users are required to download the package [globpso](https://github.com/willgertsch/SingleObjApp/blob/main/app.R).
 The package can be downloaded by the following code.    
-    install.packages("devtools")
+    install.packages("devtools") 
     devtools::install_github("PingYangChen/globpso")
 
 In our app, we only allow users to search for up to 15 number of design points for all 5 optimal exact design problems mentioned in our paper to avoid exhausting the avaiable computing resource on the server. 
