@@ -3,6 +3,7 @@ This repository contains the sources code of the app [Optimal experimental desig
 
 The source code is written in the R programming language. Users are required to download the package [globpso](https://github.com/willgertsch/SingleObjApp/blob/main/app.R).
 The package can be downloaded by the following code. 
+
     install.packages("devtools")
     devtools::install_github("PingYangChen/globpso")
 
@@ -12,6 +13,7 @@ Hence, we suggest useres to adjust and run the codes on their own device for lar
 For more details of the background knowledge of our works, please refer to the user manual page of our [app](https://brianwu.shinyapps.io/hormeis_ed_pso/). 
 
 The following R code (main.R) is an example of how to use the source code. 
+
     ##Filename: main.R
     # Load the required packages and the main functions
     library(globpso)
