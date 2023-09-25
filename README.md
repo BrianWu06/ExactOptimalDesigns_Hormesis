@@ -95,8 +95,8 @@ The following R code (main.R) is an example of how to use the source code.
     clog_par <- clogistic_params(alpha = 1, beta1 = 3, beta2 = 2, beta3 = -1)
     psoinfo_clog <- psoinfo_setting(nSwarms = 128, Iters = 1000)
     
-# Replicate 5-Point D-Optimal Exact Design for cubic logistic model 5 times.
-clog_res <- clogistic_pso_rep(nRep = 5, nPoints = 5, parms = clog_par, psoinfo = psoinfo_clog)
-clog_res$result
-clog_res$approximate_design
-
+    # Replicate 5-Point D-Optimal Exact Design for cubic logistic model 5 times.
+    clog_res <- clogistic_pso_rep(nRep = 5, nPoints = 5, parms = clog_par, psoinfo = psoinfo_clog)
+    clog_res$result
+    clog_res$approximate_design
+    
