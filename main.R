@@ -58,7 +58,7 @@ log_par <- logistic_params(alpha = 2, beta = 1)
 psoinfo_log <- psoinfo_setting(nSwarms = 128, Iters = 1000)
 
 # Replicate 2-Point D-Optimal Exact Design for simple logistic model 5 times.
-log_res <- logistic_doptimal_pso_rep(nRep = 5, nPoints = 2, parms = log_par, psoinfo = psoinfo_log)
+log_res <- logistic_pso_rep(nRep = 5, nPoints = 2, parms = log_par, psoinfo = psoinfo_log)
 log_res$result
 log_res$approximate_design
 

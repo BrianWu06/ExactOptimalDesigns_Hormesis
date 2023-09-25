@@ -659,7 +659,7 @@ logistic_doptimal_approx <- function(parms){
 }
 
 # Replicate m PSO results of the D-optimal exact design for simple logistic model
-logistic_doptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
+logistic_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
   
   # The D-optimal approximate design for the simple logistic model under certain parameter set.
   approx_design <- logistic_doptimal_approx(parms)
