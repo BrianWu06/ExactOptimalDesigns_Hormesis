@@ -1,7 +1,9 @@
 library(shiny)
+library(shinyvalidate)
 library(globpso)
 library(waiter)
 library(dplyr)
+library(ggplot2)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -27,7 +29,7 @@ ui <- fluidPage(
       will be triggered and search for the optimal exact designs of the corresponding model. 
       As the searching process terminates."), 
       
-      tags$h2("Parameters users are allowed to adjust."), 
+      tags$h2("Parameters"), 
       tags$div(
         tags$b("Number of Particles:"), 
         "How many particles are used for searching in the PSO algorithm. 
@@ -62,6 +64,24 @@ ui <- fluidPage(
                "https://github.com/BrianWu06/ExactOptimalDesigns_Hormesis")
         
       ),
+      
+      tags$h2("Output"), 
+      tags$b("Exact Design:"), 
+      "After running PSO, the app will show the best exact design among all replications. The column 
+      Support Points stands for the suggested dose while the column Replications stands for the number of 
+      observations required for the corresponding support point.",
+      tags$br(),
+      tags$b("Efficiency:"),
+      "The app displays the efficiency of the exact design to tell the users the worth of this design. It 
+      is the ratio of the criterion value from the current exact design and the corresponding optimal 
+      approximate design. e.g. a design with 0.5 efficiency means that it has to be replicated twice to do 
+      as well as the optimal approximate design. We will take the n-root of the ratio for interpretability, 
+      where n is the number of points in the exact design.",
+      tags$br(),
+      tags$b("Approximate Design:"),
+      "The app also shows the optimal approximate design for users to compare the exact designs with. 
+      Approximate designs can also help users to identify whether the current exact design is optimal.",
+      
       
       tags$h2("Particle Swarm Optimization"), 
       tags$p("Particle swarm optimization is a population-based metaheuristic algorithim that 
@@ -168,7 +188,7 @@ $$"),
              \\(\\theta=(c_0,c_1,\\beta_0,\\beta_1)\\)."),
       
       
-      tags$h2("D-optimal Exact Design for Simple Logistic Model"), 
+      tags$h2("Simple Logistic Model"), 
       tags$p("Logistic models are widely used to model the probability of a binary type 
              response variable. That is, whether an event will occur or not. The simple 
              logistic model with one predictor variable is proposed as following."),
@@ -180,7 +200,7 @@ $$"),
              confidence region of the parameter set \\(\\theta=(\\alpha,\\beta)\\)"),
       
       
-      tags$h2("D-optimal Exact Design for Quadratic Logistic Model"), 
+      tags$h2("Quadratic Logistic Model"), 
       tags$p("Similar as the simple logistic model, the quadratic logistic model only adds the 
              quadratic term of the predictor variabls."),
       tags$p("$$
@@ -190,7 +210,7 @@ $$"),
              exact design also aims to mazimize the determinent of the paramter set. [5]"),
       
       
-      tags$h2("D-optimal Exact Design for Cubic Logistic Model"), 
+      tags$h2("Cubic Logistic Model"), 
       tags$p("The cubic logistic models include the cubic term of the predictor in the 
              quadratic logistic modelss."),
       tags$p("$$
@@ -245,45 +265,75 @@ $$"),
         tabPanel("Optimal Exact Designs for Hunt-Bowman Model", 
                  sidebarLayout(
                    sidebarPanel(
-                     tags$h3("PSO parameters"), 
-                     numericInput("hb_swarm", 
-                                  "Number of Swarms", 
-                                  value = 64, 
+                     tags$h3("Hunt-Bowman Model Parameters"), 
+                     numericInput("hb_c1", 
+                                  "\\(c_1\\)", 
+                                  value = 170, 
                                   min = 1, 
-                                  max = Inf, 
-                                  step = 1), 
-                     numericInput("hb_iter", 
-                                  "Number of Iterations", 
-                                  value = 1000, 
-                                  min = 1, 
-                                  max = Inf, 
-                                  step = 1
-                     ), 
-                     numericInput("hb_rep", 
-                                  "Number of Replications", 
-                                  value = 5, 
-                                  min = 1, 
-                                  max = 10, 
-                                  step = 1
-                     ),
+                                  max = Inf), 
+                     numericInput("hb_tau", 
+                                  "\\(\\tau\\)", 
+                                  value = 0.04, 
+                                  min = 0, 
+                                  max = 0.15), 
+                     numericInput("hb_b0", 
+                                  "\\(\\beta_0\\)", 
+                                  value = 1.46, 
+                                  min = 0, 
+                                  max = Inf), 
+                     numericInput("hb_b1", 
+                                  "\\(\\beta_1\\)", 
+                                  value = 40, 
+                                  min = 0, 
+                                  max = Inf),
+                     
                      tags$h3("Design Parameters"), 
+                     numericInput("hb_ub", 
+                                  "Upper Bound of Design Space (min = 0, max = 1)", 
+                                  value = 0.15, 
+                                  min = 0, 
+                                  max = 1, 
+                                  step = 0.01
+                     ), 
                      numericInput("hb_dim", 
-                                  "Number of Design Points", 
+                                  "N = number of observations (min = 1, max = 15)", 
                                   value = 4, 
                                   min = 1, 
                                   max = 15, 
                                   step = 1
                      ), 
                      selectInput("hb_criterion", 
-                                 "Criterion:", 
+                                 "Criterion (The criterion of the optimal exact design)", 
                                  c("D" = "hbd", 
                                    "tau" = "hbtau", 
                                    "h" = "hbh")
-                       
-                     )
+                     ), 
+                     
+                     tags$h3("PSO parameters"), 
+                     numericInput("hb_swarm", 
+                                  "Number of Swarms", 
+                                  value = 32, 
+                                  min = 1, 
+                                  max = Inf, 
+                                  step = 1), 
+                     numericInput("hb_iter", 
+                                  "Number of Iterations", 
+                                  value = 500, 
+                                  min = 1, 
+                                  max = Inf, 
+                                  step = 1
+                     ), 
+                     numericInput("hb_rep", 
+                                  "Number of reruns for PSO (min = 1, max = 10)", 
+                                  value = 5, 
+                                  min = 1, 
+                                  max = 10, 
+                                  step = 1
+                     ),
+                     
                    ), 
                    mainPanel(
-                     tags$h3("Exact Designs for Hunt-Bowman Model"), 
+                     tags$h2("Optimal Exact Designs for Hunt-Bowman Model"), 
                      tags$p("The Hunt-Bowman model is presented as the following equation."),
                      tags$p("$$
  \\mu(d)=\\begin{cases} 
@@ -291,114 +341,185 @@ $$"),
   \\frac{1}{1+e^{\\beta_0-\\beta_1(d-\\tau)}}, & \\tau<d 
   \\end{cases}
  $$"),
-                     fluidRow(
-                       column(8, 
-                              tags$h4("Hunt-Bowman Model Parameters"), 
-                              numericInput("hb_c1", 
-                                           "\\(c_1\\)", 
-                                           value = 170, 
-                                           min = 1, 
-                                           max = Inf), 
-                              numericInput("hb_tau", 
-                                           "\\(\\tau\\)", 
-                                           value = 0.04, 
-                                           min = 0, 
-                                           max = 0.15), 
-                              numericInput("hb_b0", 
-                                           "\\(\\beta_0\\)", 
-                                           value = 1.46, 
-                                           min = 0, 
-                                           max = Inf), 
-                              numericInput("hb_b1", 
-                                           "\\(\\beta_1\\)", 
-                                           value = 40, 
-                                           min = 0, 
-                                           max = Inf), 
-                              
-                       )
-                     ), 
+                     tags$h3("Parameters"),
+                     tags$p(tags$h4("Design Parameters:"), 
+                            tags$b("Design Space:"), 
+                            "The lower bound of the design space for Hunt-Bowman models are always 
+                            set to 0, while the upper bound can be adjusted from 0 to 1.", 
+                            tags$br(),
+                            tags$b("Number of Observations:"), 
+                            "The number of observations for the design.",
+                            tags$br(),
+                            tags$b("Criterion:"),
+                            "There are 3 design criterions available: D, \\(\\tau\\), and h."
+                            ),
+                     tags$p(tags$h4("PSO parameters"), 
+                            tags$b("Number of Swarms and Iterations:"), 
+                            "Increasing the number of swarms and iterations of PSO can increase the likelihood 
+                            of finding the optimal exact design, but more time-consuming.", 
+                            tags$br(),
+                            tags$b("Number of reruns for PSO:"), 
+                            "The number of reruns is the number of PSO repeatedly executes. The output result 
+                            is based on the best result among all reruns. The greater value can 
+                            increase the likelihood of finding the optimal exact design, but more 
+                            time consuming."
+                            ),
+                     tags$h3("Output"), 
+                     tags$p(tags$h4("Plot dose-response relationship"),
+                            "The dose-response relationship based on the current parameter setting 
+                            (model parameters and design space)."
+                            ),
+                     tags$p(tags$h4("Start Searching"), 
+                            "The search can take minutes to finish under default setting. Feel free
+                            to adjust the input parameters for better results (e.g. \\(\\tau\\)-optimal exact design may
+                            need more particles and swarms) 
+                            or more efficient computing.",
+                            tags$br(),
+                            tags$b("Exact Design:"), 
+                            "The best exact design found by PSO under the current parameter setting.", 
+                            tags$br(), 
+                            tags$b("Efficiency:"), 
+                            "The relative efficiency of the best exact design found by PSO.", 
+                            tags$br(), 
+                            tags$b("Approximate Design"), 
+                            "The approximate design found by PSO, which can be used to verify whether the best 
+                            exact design found by PSO is the optimal exact design."
+                            ),
+                     
                      use_waiter(),
+                     actionButton("hb_plot_response", "Plot dose-response relationship"), 
+                     plotOutput("hb_plot"),
                      actionButton("hb_pso", "Start Searching"), 
-                     tagAppendAttributes(verbatimTextOutput("hb_out"), style = "height:200px;")
+                     tagAppendAttributes(verbatimTextOutput("hb_out"), style = "height:300px;")
                    )
                  )
         ), 
         
-        tabPanel("Optiaml Exact Design for exp-log Model", 
+        tabPanel("Optiaml Exact Designs for exp-log Model", 
                  sidebarLayout(
                    sidebarPanel(
-                     tags$h3("PSO parameters"), 
-                     numericInput("el_swarm", 
-                                  "Number of Swarms", 
-                                  value = 128, 
-                                  min = 1, 
-                                  max = Inf, 
-                                  step = 1), 
-                     numericInput("el_iter", 
-                                  "Number of Iterations", 
-                                  value = 2000, 
-                                  min = 1, 
-                                  max = Inf, 
-                                  step = 1
-                     ), 
-                     numericInput("el_rep", 
-                                  "Number of Replications", 
-                                  value = 5, 
-                                  min = 1, 
-                                  max = 10, 
-                                  step = 1
-                     ), 
+                     tags$h3("exp-log Model Parameters"), 
+                     numericInput("el_c0", 
+                                  "\\(c_0\\)", 
+                                  value = 0.15, 
+                                  min = 0, 
+                                  max = Inf), 
+                     numericInput("el_c1", 
+                                  "\\(c_1\\)", 
+                                  value = 89, 
+                                  min = 0, 
+                                  max = Inf), 
+                     numericInput("el_b0", 
+                                  "\\(\\beta_0\\)", 
+                                  value = 3.2, 
+                                  min = 0, 
+                                  max = Inf), 
+                     numericInput("el_b1", 
+                                  "\\(\\beta_1\\)", 
+                                  value = 41, 
+                                  min = 0, 
+                                  max = Inf),
+                     
                      tags$h3("Design Parameters"), 
+                     numericInput("el_ub", 
+                                  "Upper Bound of Design Space (min = 0, max = 1)", 
+                                  value = 0.15, 
+                                  min = 0, 
+                                  max = 1, 
+                                  step = 0.1
+                     ), 
                      numericInput("el_dim", 
-                                  "Number of Design Points", 
+                                  "N = total number of observations (min = 1, max = 15)", 
                                   value = 4, 
                                   min = 1, 
                                   max = 15, 
                                   step = 1
-                     ),
+                     ), 
                      selectInput("el_criterion", 
                                  "Criterion:", 
                                  c("D" = "eld", 
                                    "tau" = "eltau", 
                                    "h" = "elh")
                                  
-                     )
+                     ), 
+                     
+                     tags$h3("PSO parameters"), 
+                     numericInput("el_swarm", 
+                                  "Number of Swarms", 
+                                  value = 32, 
+                                  min = 1, 
+                                  max = Inf, 
+                                  step = 1), 
+                     numericInput("el_iter", 
+                                  "Number of Iterations", 
+                                  value = 500, 
+                                  min = 1, 
+                                  max = Inf, 
+                                  step = 1
+                     ), 
+                     numericInput("el_rep", 
+                                  "Number of reruns for PSO (min = 1, max = 15)", 
+                                  value = 5, 
+                                  min = 1, 
+                                  max = 10, 
+                                  step = 1
+                     ), 
                    ), 
                    mainPanel(
-                     tags$h3("Optimal Exact Designs for exp-log Model"), 
+                     tags$h2("Optimal Exact Designs for exp-log Model"), 
                      tags$p("The exp-log model is presented as the following equation:"),
                      tags$p("$$
  \\mu(d) = c_0e^{-c_1d}+\\frac{1}{1+e^{\\beta_0-\\beta_1d}}
  $$"),
-                     fluidRow(
-                       column(8, 
-                              tags$h4("exp-log Model Parameters"), 
-                              numericInput("el_c0", 
-                                           "\\(c_0\\)", 
-                                           value = 0.15, 
-                                           min = 0, 
-                                           max = Inf), 
-                              numericInput("el_c1", 
-                                           "\\(c_1\\)", 
-                                           value = 89, 
-                                           min = 0, 
-                                           max = Inf), 
-                              numericInput("el_b0", 
-                                           "\\(\\beta_0\\)", 
-                                           value = 3.2, 
-                                           min = 0, 
-                                           max = Inf), 
-                              numericInput("el_b1", 
-                                           "\\(\\beta_1\\)", 
-                                           value = 41, 
-                                           min = 0, 
-                                           max = Inf), 
-                              
-                       )
-                     ), 
+                     tags$h3("Parameters"),
+                     tags$p(tags$h4("Design Parameters:"), 
+                            tags$b("Design Space:"), 
+                            "The lower bound of the design space for exp-log models are always 
+                            set to 0, while the upper bound can be adjusted from 0 to 1.", 
+                            tags$br(),
+                            tags$b("Number of Observations:"), 
+                            "The number of observations for the design.",
+                            tags$br(),
+                            tags$b("Criterion:"),
+                            "There are 3 design criterions available: D, \\(\\tau\\), and h."
+                     ),
+                     tags$p(tags$h4("PSO parameters"), 
+                            tags$b("Number of Swarms and Iterations:"), 
+                            "Increasing the number of swarms and iterations of PSO can increase the likelihood 
+                            of finding the optimal exact design, but more time-consuming.", 
+                            tags$br(),
+                            tags$b("Number of reruns for PSO:"), 
+                            "The number of reruns is the number of PSO repeatedly executes. The output result 
+                            is based on the best result among all reruns. The greater value can 
+                            increase the likelihood of finding the optimal exact design, but more 
+                            time consuming."
+                     ),
+                     tags$h3("Output"), 
+                     tags$p(tags$h4("Plot dose-response relationship"),
+                            "The dose-response relationship based on the current parameter setting 
+                            (model parameters and design space)."
+                     ),
+                     tags$p(tags$h4("Start Searching"), 
+                            "The search can take minutes to finish under default setting. Feel free
+                            to adjust the input parameters for better results (e.g. \\(\\tau\\)-optimal exact design may
+                            need more particles and swarms) or more efficient computing.",
+                            tags$br(),
+                            tags$b("Exact Design:"), 
+                            "The best exact design found by PSO under the current parameter setting.", 
+                            tags$br(), 
+                            tags$b("Efficiency:"), 
+                            "The relative efficiency of the best exact design found by PSO.", 
+                            tags$br(), 
+                            tags$b("Approximate Design:"), 
+                            "The approximate design found by PSO, which can be used to verify whether the best 
+                            exact design found by PSO is the optimal exact design."
+                     ),
+                     
                      use_waiter(),
+                     actionButton("el_plot_response", "Plot dose-response relationship"), 
+                     plotOutput("el_plot"),
                      actionButton("el_pso", "Start Searching"), 
-                     tagAppendAttributes(verbatimTextOutput("el_out"), style = "height:200px;")
+                     tagAppendAttributes(verbatimTextOutput("el_out"), style = "height:300px;")
                    )
                  )
         ), 
@@ -406,61 +527,109 @@ $$"),
         tabPanel("D-Optiaml Exact Design for Simple Logistic Model", 
                  sidebarLayout(
                    sidebarPanel(
+                     tags$h3("Simple Logistic Model Parameters"), 
+                     numericInput("logistic_a", 
+                                  "\\(\\alpha\\)", 
+                                  value = 2, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     numericInput("logistic_b", 
+                                  "\\(\\beta\\)", 
+                                  value = 1, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     
+                     tags$h3("Design Parameters"), 
+                     numericInput("logistic_bd", 
+                                  "The Boundary of Design Space (min = 0)", 
+                                  value = 5, 
+                                  min = 0, 
+                                  max = Inf, 
+                                  step = 0.1
+                     ),
+                     numericInput("logistic_dim", 
+                                  "N = total number of observations (min = 1, max = 15)", 
+                                  value = 2, 
+                                  min = 1, 
+                                  max = 15, 
+                                  step = 1
+                     ), 
+                     
                      tags$h3("PSO parameters"), 
                      numericInput("logistic_swarm", 
                                   "Number of Swarms", 
-                                  value = 64, 
+                                  value = 32, 
                                   min = 1, 
                                   max = Inf, 
                                   step = 1), 
                      numericInput("logistic_iter", 
                                   "Number of Iterations", 
-                                  value = 1000, 
+                                  value = 500, 
                                   min = 1, 
                                   max = Inf, 
                                   step = 1
                      ),
                      numericInput("logistic_rep", 
-                                  "Number of Replications", 
+                                  "Number of reruns for PSO (min = 1, max = 10)", 
                                   value = 5, 
                                   min = 1, 
                                   max = 10, 
                                   step = 1
-                     ), 
-                     tags$h3("Design Parameters"), 
-                     numericInput("logistic_dim", 
-                                  "Number of Design Points", 
-                                  value = 2, 
-                                  min = 1, 
-                                  max = 15, 
-                                  step = 1
                      ),
                    ), 
                    mainPanel(
-                     tags$h3("D-optimal Exact Design for Simple Logistic Model"), 
+                     tags$h2("D-optimal Exact Design for Simple Logistic Model"), 
                      tags$p("The simple logistic model is presented as the following equation:"),
                      tags$p("$$
  E(y) = \\frac{e^{\\alpha + \\beta x}}{1 + e^{\\alpha + \\beta x}}
  $$"),
-                     fluidRow(
-                       column(8, 
-                              tags$h4("Simple Logistic Model Parameters"), 
-                              numericInput("logistic_a", 
-                                           "\\(\\alpha\\)", 
-                                           value = 2, 
-                                           min = -Inf, 
-                                           max = Inf), 
-                              numericInput("logistic_b", 
-                                           "\\(\\beta\\)", 
-                                           value = 1, 
-                                           min = -Inf, 
-                                           max = Inf), 
-                              
-                       )
-                     ), 
-                     use_waiter(),
+                     tags$h3("Parameters"),
+                     tags$p(tags$h4("Design Parameters:"), 
+                            tags$b("Design Space:"), 
+                            "The lower bound and upper bound of the design space for logistic models are always 
+                            set to be symmetric around 0, contorled by the parameter",
+                            tags$b("Boundary of Design Space:"),
+                            "e.g. the default value 5 means the design space is [-5, 5].",
+                            tags$br(),
+                            tags$b("Number of Observations:"), 
+                            "The number of observations for the design.",
+                     ),
+                     tags$p(tags$h4("PSO parameters"), 
+                            tags$b("Number of Swarms and Iterations:"), 
+                            "Increasing the number of swarms and iterations of PSO can increase the likelihood 
+                            of finding the optimal exact design, but more time-consuming.", 
+                            tags$br(),
+                            tags$b("Number of reruns for PSO:"), 
+                            "The number of reruns is the number of PSO repeatedly executes. The output result 
+                            is based on the best result among all reruns. The greater value can 
+                            increase the likelihood of finding the optimal exact design, but more 
+                            time consuming."
+                     ),
+                     tags$h3("Output"), 
+                     tags$p(tags$h4("Plot dose-response relationship"),
+                            "The dose-response relationship based on the current parameter setting 
+                            (model parameter and design space)."
+                     ),
+                     tags$p(tags$h4("Start Searching"), 
+                            "The search can take minutes to finish under default setting. Feel free
+                            to adjust the input parameters for better results or more efficient computing.",
+                            tags$br(),
+                            tags$b("Exact Design:"), 
+                            "The best exact design found by PSO under the current parameter setting.", 
+                            tags$br(), 
+                            tags$b("Efficiency:"), 
+                            "The relative efficiency of the best exact design found by PSO.", 
+                            tags$br(), 
+                            tags$b("Approximate Design:"), 
+                            "The approximate design found by PSO, which can be used to verify whether the best 
+                            exact design found by PSO is the optimal exact design."
+                     ),
+                     
+                     use_waiter(), 
+                     actionButton("log_plot_response", "Plot dose-response relationship"), 
+                     plotOutput("log_plot"),
                      actionButton("logistic_pso", "Start Searching"), 
-                     tagAppendAttributes(verbatimTextOutput("logistic_out"), style = "height:200px;")
+                     tagAppendAttributes(verbatimTextOutput("logistic_out"), style = "height:300px;")
                    )
                  )
         ), 
@@ -468,66 +637,115 @@ $$"),
         tabPanel("D-Optiaml Exact Design for Quadratic Logistic Model.", 
                  sidebarLayout(
                    sidebarPanel(
-                     tags$h3("PSO parameters"), 
-                     numericInput("qlogistic_swarm", 
-                                  "Number of Swarms", 
-                                  value = 64, 
-                                  min = 1, 
-                                  max = Inf, 
-                                  step = 1), 
-                     numericInput("qlogistic_iter", 
-                                  "Number of Iterations", 
-                                  value = 1000, 
-                                  min = 1, 
-                                  max = Inf, 
-                                  step = 1
-                     ),
-                     numericInput("qlogistic_rep", 
-                                  "Number of Replications", 
-                                  value = 5, 
-                                  min = 1, 
-                                  max = 10, 
-                                  step = 1
-                     ), 
+                     tags$h3("Quadratic Logistic Model Parameters"), 
+                     numericInput("qlogistic_a", 
+                                  "\\(\\alpha\\)", 
+                                  value = -3, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     numericInput("qlogistic_b1", 
+                                  "\\(\\beta_1\\)", 
+                                  value = 0, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     numericInput("qlogistic_b2", 
+                                  "\\(\\beta_2\\)", 
+                                  value = -1, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     
                      tags$h3("Design Parameters"), 
+                     numericInput("qlogistic_bd", 
+                                  "The Boundary of Design Space (min = 0)", 
+                                  value = 5, 
+                                  min = -Inf, 
+                                  max = Inf, 
+                                  step = 0.1
+                     ), 
                      numericInput("qlogistic_dim", 
-                                  "Number of Design Points", 
+                                  "N = total number of observations (min = 1, max = 15)", 
                                   value = 4, 
                                   min = 1, 
                                   max = 15, 
                                   step = 1
                      ),
+                     
+                     tags$h3("PSO parameters"), 
+                     numericInput("qlogistic_swarm", 
+                                  "Number of Swarms", 
+                                  value = 32, 
+                                  min = 1, 
+                                  max = Inf, 
+                                  step = 1), 
+                     numericInput("qlogistic_iter", 
+                                  "Number of Iterations", 
+                                  value = 500, 
+                                  min = 1, 
+                                  max = Inf, 
+                                  step = 1
+                     ),
+                     numericInput("qlogistic_rep", 
+                                  "Number of reruns for PSO (min = 1, max = 10)", 
+                                  value = 5, 
+                                  min = 1, 
+                                  max = 10, 
+                                  step = 1
+                     ), 
                    ), 
                    mainPanel(
-                     tags$h3("D-optimal Exact Design for Quadratic Logistic Model."), 
+                     tags$h2("D-optimal Exact Design for Quadratic Logistic Model."), 
                      tags$p("The quadratic logistic model is presented as the following equation:"),
                      tags$p("$$
  E(y) = \\frac{e^{\\alpha + \\beta_1 x + \\beta_2 x^2}}{1 + e^{\\alpha + \\beta_1 x + \\beta_2 x^2}}
  $$"),
-                     fluidRow(
-                       column(8, 
-                              tags$h4("Quadratic Logistic Model Parameters"), 
-                              numericInput("qlogistic_a", 
-                                           "\\(\\alpha\\)", 
-                                           value = -3, 
-                                           min = -Inf, 
-                                           max = Inf), 
-                              numericInput("qlogistic_b1", 
-                                           "\\(\\beta_1\\)", 
-                                           value = 0, 
-                                           min = -Inf, 
-                                           max = Inf), 
-                              numericInput("qlogistic_b2", 
-                                           "\\(\\beta_2\\)", 
-                                           value = -1, 
-                                           min = -Inf, 
-                                           max = Inf)
-                              
-                       )
-                     ), 
+                     tags$h3("Parameters"),
+                     tags$p(tags$h4("Design Parameters:"), 
+                            tags$b("Design Space:"), 
+                            "The lower bound and upper bound of the design space for logistic models are always 
+                            set to be symmetric around 0, contorled by the parameter",
+                            tags$b("Boundary of Design Space:"),
+                            "e.g. the default value 5 means the design space is [-5, 5].",
+                            tags$br(),
+                            tags$b("Number of Observations:"), 
+                            "The number of observations for the design.",
+                            tags$br(),
+                     ),
+                     tags$p(tags$h4("PSO parameters"), 
+                            tags$b("Number of Swarms and Iterations:"), 
+                            "Increasing the number of swarms and iterations of PSO can increase the likelihood 
+                            of finding the optimal exact design, but more time-consuming.", 
+                            tags$br(),
+                            tags$b("Number of reruns for PSO:"), 
+                            "The number of reruns is the number of PSO repeatedly executes. The output result 
+                            is based on the best result among all reruns. The greater value can 
+                            increase the likelihood of finding the optimal exact design, but more 
+                            time consuming."
+                     ),
+                     tags$h3("Output"), 
+                     tags$p(tags$h4("Plot dose-response relationship"),
+                            "The dose-response relationship based on the current parameter setting 
+                            (model parameter and design space)."
+                     ),
+                     tags$p(tags$h4("Start Searching"), 
+                            "The search can take minutes to finish under default setting. Feel free
+                            to adjust the input parameters for better results or more efficient computing.",
+                            tags$br(),
+                            tags$b("Exact Design:"), 
+                            "The best exact design found by PSO under the current parameter setting.", 
+                            tags$br(), 
+                            tags$b("Efficiency:"), 
+                            "The relative efficiency of the best exact design found by PSO.", 
+                            tags$br(), 
+                            tags$b("Approximate Design:"), 
+                            "The approximate design found by PSO, which can be used to verify whether the best 
+                            exact design found by PSO is the optimal exact design."
+                     ),
+                     
                      use_waiter(),
+                     actionButton("qlog_plot_response", "Plot dose-response relationship"), 
+                     plotOutput("qlog_plot"),
                      actionButton("qlogistic_pso", "Start Searching"), 
-                     tagAppendAttributes(verbatimTextOutput("qlogistic_out"), style = "height:200px;")
+                     tagAppendAttributes(verbatimTextOutput("qlogistic_out"), style = "height:300px;")
                    )
                  )
         ), 
@@ -535,72 +753,120 @@ $$"),
         tabPanel("D-Optiaml Exact Design for Cubic Logistic Model.", 
                  sidebarLayout(
                    sidebarPanel(
-                     tags$h3("PSO parameters"), 
-                     numericInput("clogistic_swarm", 
-                                  "Number of Swarms", 
-                                  value = 64, 
-                                  min = 1, 
-                                  max = Inf, 
-                                  step = 1), 
-                     numericInput("clogistic_iter", 
-                                  "Number of Iterations", 
-                                  value = 1000, 
-                                  min = 1, 
-                                  max = Inf, 
-                                  step = 1
-                     ),
-                     numericInput("clogistic_rep", 
-                                  "Number of Replications", 
-                                  value = 5, 
-                                  min = 1, 
-                                  max = 10, 
-                                  step = 1
-                     ), 
+                     tags$h3("Cubic Logistic Model Parameters"), 
+                     numericInput("clogistic_a", 
+                                  "\\(\\alpha\\)", 
+                                  value = -3, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     numericInput("clogistic_b1", 
+                                  "\\(\\beta_1\\)", 
+                                  value = 0, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     numericInput("clogistic_b2", 
+                                  "\\(\\beta_2\\)", 
+                                  value = 0, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     numericInput("clogistic_b3", 
+                                  "\\(\\beta_3\\)", 
+                                  value = -1, 
+                                  min = -Inf, 
+                                  max = Inf), 
+                     
                      tags$h3("Design Parameters"), 
                      numericInput("clogistic_dim", 
-                                  "Number of Design Points", 
+                                  "N = total number of observations (min = 1, max = 15)", 
                                   value = 4, 
                                   min = 1, 
                                   max = 15, 
                                   step = 1
                      ),
+                     numericInput("clogistic_bd", 
+                                  "The Boundary of Design Space (min = 0)", 
+                                  value = 5, 
+                                  min = -Inf, 
+                                  max = Inf, 
+                                  step = 0.1
+                     ), 
+                     
+                     tags$h3("PSO parameters"), 
+                     numericInput("clogistic_swarm", 
+                                  "Number of Swarms", 
+                                  value = 32, 
+                                  min = 1, 
+                                  max = Inf, 
+                                  step = 1), 
+                     numericInput("clogistic_iter", 
+                                  "Number of Iterations", 
+                                  value = 500, 
+                                  min = 1, 
+                                  max = Inf, 
+                                  step = 1
+                     ),
+                     numericInput("clogistic_rep", 
+                                  "Number of reruns for PSO (min = 1, max = 10)", 
+                                  value = 5, 
+                                  min = 1, 
+                                  max = 10, 
+                                  step = 1
+                     ), 
                    ), 
                    mainPanel(
-                     tags$h3("D-optimal Exact Design for Cubic Logistic Model."), 
+                     tags$h2("D-optimal Exact Design for Cubic Logistic Model."), 
                      tags$p("The cubic logistic model is presented as the following equation:"),
                      tags$p("$$
  E(y) = \\frac{e^{\\alpha + \\beta_1 x + \\beta_2 x^2 + \\beta_3 x^3}}
  {1 + e^{\\alpha + \\beta_1 x + \\beta_2 x^2 + \\beta_3 x^3}}
  $$"),
-                     fluidRow(
-                       column(8, 
-                              tags$h4("Cubic Logistic Model Parameters"), 
-                              numericInput("clogistic_a", 
-                                           "\\(\\alpha\\)", 
-                                           value = -3, 
-                                           min = -Inf, 
-                                           max = Inf), 
-                              numericInput("clogistic_b1", 
-                                           "\\(\\beta_1\\)", 
-                                           value = 0, 
-                                           min = -Inf, 
-                                           max = Inf), 
-                              numericInput("clogistic_b2", 
-                                           "\\(\\beta_2\\)", 
-                                           value = 0, 
-                                           min = -Inf, 
-                                           max = Inf), 
-                              numericInput("clogistic_b3", 
-                                           "\\(\\beta_3\\)", 
-                                           value = -1, 
-                                           min = -Inf, 
-                                           max = Inf)
-                              
-                       )
-                     ), 
+                     tags$h3("Parameters"),
+                     tags$p(tags$h4("Design Parameters:"), 
+                            tags$b("Design Space:"), 
+                            "The lower bound and upper bound of the design space for logistic models are always 
+                            set to be symmetric around 0, contorled by the parameter",
+                            tags$b("Boundary of Design Space:"),
+                            "e.g. the default value 5 means the design space is [-5, 5].",
+                            tags$br(),
+                            tags$b("Number of Observations:"), 
+                            "The number of observations for the design.",
+                     ),
+                     tags$p(tags$h4("PSO parameters"), 
+                            tags$b("Number of Swarms and Iterations:"), 
+                            "Increasing the number of swarms and iterations of PSO can increase the likelihood 
+                            of finding the optimal exact design, but more time-consuming.", 
+                            tags$br(),
+                            tags$b("Number of reruns for PSO:"), 
+                            "The number of reruns is the number of PSO repeatedly executes. The output result 
+                            is based on the best result among all reruns. The greater value can 
+                            increase the likelihood of finding the optimal exact design, but more 
+                            time consuming."
+                     ),
+                     tags$h3("Output"), 
+                     tags$p(tags$h4("Plot dose-response relationship"),
+                            "The dose-response relationship based on the current parameter setting 
+                            (model parameter and design space)."
+                     ),
+                     tags$p(tags$h4("Start Searching"), 
+                            "The search can take minutes to finish under default setting. Feel free
+                            to adjust the input parameters for better results or more efficient computing.",
+                            tags$br(),
+                            tags$b("Exact Design:"), 
+                            "The best exact design found by PSO under the current parameter setting.", 
+                            tags$br(), 
+                            tags$b("Efficiency:"), 
+                            "The relative efficiency of the best exact design found by PSO.", 
+                            tags$br(), 
+                            tags$b("Approximate Design:"), 
+                            "The approximate design found by PSO, which can be used to verify whether the best 
+                            exact design found by PSO is the optimal exact design."
+                     ),
+                     
                      use_waiter(),
+                     actionButton("clog_plot_response", "Plot dose-response relationship"), 
+                     plotOutput("clog_plot"),
                      actionButton("clogistic_pso", "Start Searching"), 
-                     tagAppendAttributes(verbatimTextOutput("clogistic_out"), style = "height:200px;")
+                     tagAppendAttributes(verbatimTextOutput("clogistic_out"), style = "height:300px;")
                    )
                  )
         )
@@ -617,16 +883,65 @@ $$"),
 # Define server logic required to draw a histogram
 server <- function(input, output) {
   values <- reactiveValues()
-  values$hb <- list(val = numeric(), eff = numeric(), points = c(), 
-                    approximate_design = data.frame(suport_points = c(0), weight = c(0)))
-  values$el <- list(val = numeric(), eff = numeric(), points = c(), 
-                    approximate_design = data.frame(suport_points = c(0), weight = c(0)))
-  values$logistic <- list(val = numeric(), eff = numeric(), points = c(), 
-                          approximate_design = data.frame(suport_points = c(0), weight = c(0)))
-  values$qlogistic <- list(val = numeric(), eff = numeric(), points = c(), 
-                           approximate_design = data.frame(suport_points = c(0), weight = c(0)))
-  values$clogistic <- list(val = numeric(), eff = numeric(), points = c(), 
-                           approximate_design = data.frame(suport_points = c(0), weight = c(0)))
+  values$hb <- list(val = numeric(), eff = numeric(), 
+                    exact_design = data.frame("Support Points" = c(0), "Replications" = c(0)), 
+                    approximate_design = data.frame("Support Points" = c(0), "Weights" = c(0)), 
+                    drplot = ggplot())
+  values$el <- list(val = numeric(), eff = numeric(), 
+                    exact_design = data.frame("Support Points" = c(0), "Replications" = c(0)), 
+                    approximate_design = data.frame("Support Points" = c(0), "Weights" = c(0)), 
+                    drplot = ggplot())
+  values$logistic <- list(val = numeric(), eff = numeric(), 
+                          exact_design = data.frame("Support Points" = c(0), "Replications" = c(0)), 
+                          approximate_design = data.frame("Support Points" = c(0), "Weights" = c(0)), 
+                          drplot = ggplot())
+  values$qlogistic <- list(val = numeric(), eff = numeric(), 
+                           exact_design = data.frame("Support Points" = c(0), "Replications" = c(0)), 
+                           approximate_design = data.frame("Support Points" = c(0), "Weights" = c(0)), 
+                           drplot = ggplot())
+  values$clogistic <- list(val = numeric(), eff = numeric(), 
+                           exact_design = data.frame("Support Points" = c(0), "Replications" = c(0)), 
+                           approximate_design = data.frame("Support Points" = c(0), "Weights" = c(0)), 
+                           drplot = ggplot())
+  
+  iv <- InputValidator$new()
+  iv$add_rule("hb_dim", sv_between(1, 15))
+  iv$add_rule("el_dim", sv_between(1, 15))
+  iv$add_rule("logistic_dim", sv_between(1, 15))
+  iv$add_rule("qlogistic_dim", sv_between(1, 15))
+  iv$add_rule("clogistic_dim", sv_between(1, 15))
+  
+  iv$add_rule("hb_rep", sv_between(1, 10))
+  iv$add_rule("el_rep", sv_between(1, 10))
+  iv$add_rule("logistic_rep", sv_between(1, 10))
+  iv$add_rule("qlogistic_rep", sv_between(1, 10))
+  iv$add_rule("clogistic_rep", sv_between(1, 10))
+  
+  iv$add_rule("hb_ub", sv_between(0, 1))
+  iv$add_rule("el_ub", sv_between(0, 1))
+  iv$add_rule("logistic_ub", sv_gt(0))
+  iv$add_rule("qlogistic_ub", sv_gt(0))
+  iv$add_rule("clogistic_ub", sv_gt(0))
+  
+  iv$enable()
+  
+  observeEvent(input$hb_plot_response, {
+    c1 = input$hb_c1
+    tau = input$hb_tau
+    b0 = input$hb_b0
+    b1 = input$hb_b1
+    ub = input$hb_ub
+    
+    fp <- seq(0, ub, by = (ub - 0)/100)
+    hb_df <- data.frame(dose = fp, response = sapply(fp, function(x) hunt_bowman(x, c1, tau, b0, b1)))
+    values$hb$drplot <- ggplot(data = hb_df, aes(x = dose, y = response)) + 
+      geom_line()
+  })
+  
+  output$hb_plot <- renderPlot({
+    drplot = values$hb$drplot
+    drplot
+  })
   
   observeEvent(input$hb_pso, {
     waiter1 <- waiter::Waiter$new(
@@ -646,31 +961,55 @@ server <- function(input, output) {
     ndp = input$hb_dim
     nrep = input$hb_rep
     criterion = input$hb_criterion
+    ub = input$hb_ub
     
     hb_par <- hb_parms(c1 = c1, tau = tau, b0 = b0, b1 = b1)
     psoinfo_hb <- psoinfo_setting(nSwarms = nswarm, Iters = iter)
     if (criterion == "hbd"){
-      hb_res <- hb_doptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = hb_par, psoinfo = psoinfo_hb)
+      hb_res <- hb_doptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = hb_par, 
+                                    psoinfo = psoinfo_hb, upper = ub)
     } else if (criterion == "hbtau"){
-      hb_res <- hb_tauoptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = hb_par, psoinfo = psoinfo_hb)
+      hb_res <- hb_tauoptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = hb_par, 
+                                      psoinfo = psoinfo_hb, upper = ub)
     } else if (criterion == "hbh"){
-      hb_res <- hb_hoptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = hb_par, psoinfo = psoinfo_hb)
+      hb_res <- hb_hoptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = hb_par, 
+                                    psoinfo = psoinfo_hb, upper = ub)
     }
     
     values$hb$val = hb_res$result$best_val
-    values$hb$points = hb_res$result$design_points
+    values$hb$exact_design <- hb_res$result$design_points |> table() |> data.frame()
+    colnames(values$hb$exact_design) <- c("Support Points", "Replications")
     values$hb$eff = hb_res$result$efficiency
-    values$hb$approx = hb_res$approximate_design
+    values$hb$approximate_design = hb_res$approximate_design
+    colnames(values$hb$approximate_design) <- c("Support Points", "Weights")
   }
                )
   
   output$hb_out <- renderPrint({
-    cat("Design Points:", values$hb$points, "\n", "\n")
-    cat("Efficiency:", values$hb$eff, "\n", "\n")
+    cat("Exact Design:", "\n")
+    print(values$hb$exact_design, row.names = F)
+    cat("\n", "Efficiency: ", values$hb$eff, "\n", "\n", sep = "")
     cat("Approximate Design:", "\n")
-    print(values$hb$approx)
+    print(values$hb$approximate_design, row.names = F)
   })
   
+  observeEvent(input$el_plot_response, {
+    c0 = input$el_c0
+    c1 = input$el_c1
+    b0 = input$el_b0
+    b1 = input$el_b1
+    ub = input$el_ub
+    
+    fp <- seq(0, ub, by = (ub - 0)/100)
+    el_df <- data.frame(dose = fp, response = sapply(fp, function(x) exp_log(x, c0, c1, b0, b1)))
+    values$el$drplot <- ggplot(data = el_df, aes(x = dose, y = response)) + 
+      geom_line()
+  })
+  
+  output$el_plot <- renderPlot({
+    drplot = values$el$drplot
+    drplot
+  })
   
   observeEvent(input$el_pso, {
     waiter2 <- waiter::Waiter$new(
@@ -690,29 +1029,53 @@ server <- function(input, output) {
     ndp = input$el_dim
     nrep = input$el_rep
     criterion = input$el_criterion
+    ub = input$el_ub
     
     el_par <- exp_log_params(c0 = c0, c1 = c1, b0 = b0, b1 = b1)
     psoinfo_el <- psoinfo_setting(nSwarms = nswarm, Iters = iter)
     if (criterion == "eld"){
-      el_res <- exp_log_doptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = el_par, psoinfo = psoinfo_el)
+      el_res <- exp_log_doptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = el_par, 
+                                         psoinfo = psoinfo_el, upper = ub)
     } else if (criterion == "eltau"){
-      el_res <- exp_log_tauoptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = el_par, psoinfo = psoinfo_el)
+      el_res <- exp_log_tauoptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = el_par, 
+                                           psoinfo = psoinfo_el, upper = ub)
     } else if (criterion == "elh"){
-      el_res <- exp_log_hoptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = el_par, psoinfo = psoinfo_el)
+      el_res <- exp_log_hoptimal_pso_rep(nRep = nrep, nPoints = ndp, parms = el_par, 
+                                         psoinfo = psoinfo_el, upper = ub)
     }
     
     values$el$val = el_res$result$best_val
-    values$el$points = el_res$result$design_points
+    values$el$exact_design <- el_res$result$design_points |> table() |> data.frame()
+    colnames(values$el$exact_design) <- c("Support Points", "Replications")
     values$el$eff = el_res$result$efficiency
-    values$el$approx = el_res$approximate_design
+    values$el$approximate_design = el_res$approximate_design
+    colnames(values$el$approximate_design) <- c("Support Points", "Weights")
   }
   )
   
   output$el_out <- renderPrint({
-    cat("Design Points:", values$el$points, "\n", "\n")
-    cat("Efficiency:", values$el$eff, "\n", "\n")
+    cat("Exact Design:", "\n")
+    print(values$el$exact_design, row.names = F)
+    cat("\n","Efficiency: ", values$el$eff, "\n", "\n", sep = "")
     cat("Approximate Design:", "\n")
-    print(values$el$approx)
+    print(values$el$approximate_design, row.names = F)
+  })
+  
+  observeEvent(input$log_plot_response, {
+    alpha = input$logistic_a
+    beta = input$logistic_b
+    lb = input$logistic_bd * -1
+    ub = input$logistic_bd
+    
+    fp <- seq(lb, ub, by = (ub - lb)/100)
+    log_df <- data.frame(dose = fp, response = sapply(fp, function(x) logistic(x, alpha, beta)))
+    values$logistic$drplot <- ggplot(data = log_df, aes(x = dose, y = response)) + 
+      geom_line()
+  })
+  
+  output$log_plot <- renderPlot({
+    drplot = values$logistic$drplot
+    drplot
   })
   
   observeEvent(input$logistic_pso, {
@@ -730,24 +1093,47 @@ server <- function(input, output) {
     iter = input$logistic_iter
     ndp = input$logistic_dim
     nrep = input$logistic_rep
+    bd = input$logistic_bd
     
     logistic_par <- logistic_params(alpha, beta)
     psoinfo_logistic <- psoinfo_setting(nSwarms = nswarm, Iters = iter)
-    logistic_res <- logistic_pso_rep(nRep = nrep, nPoints = ndp, parms = logistic_par, psoinfo = psoinfo_logistic)
+    logistic_res <- logistic_pso_rep(nRep = nrep, nPoints = ndp, parms = logistic_par, 
+                                     psoinfo = psoinfo_logistic, bound = bd)
     
     values$logistic$val = logistic_res$result$best_val
-    values$logistic$points = logistic_res$result$design_points
+    values$logistic$exact_design <- logistic_res$result$design_points |> table() |> data.frame()
+    colnames(values$logistic$exact_design) <- c("Support Points", "Replications")
     values$logistic$eff = logistic_res$result$efficiency
-    values$logistic$approx = logistic_res$approximate_design
+    values$logistic$approximate_design = logistic_res$approximate_design
+    colnames(values$logistic$approximate_design) <- c("Support Points", "Weights")
   }
   )
   
   output$logistic_out <- renderPrint({
-    cat("Design Points:", values$logistic$points, "\n", "\n")
-    cat("Efficiency:", values$logistic$eff, "\n", "\n")
+    cat("Exact Design:", "\n")
+    print(values$logistic$exact_design, row.names = F)
+    cat("\n","Efficiency: ", values$logistic$eff, "\n", "\n", sep = "")
     cat("Approximate Design:", "\n")
-    print(values$logistic$approx)
+    print(values$logistic$approximate_design, row.names = F)
   })
+  
+  observeEvent(input$qlog_plot_response, {
+    alpha = input$qlogistic_a
+    beta1 = input$qlogistic_b1
+    beta2 = input$qlogistic_b2
+    lb = input$qlogistic_bd * -1
+    ub = input$qlogistic_bd
+    
+    fp <- seq(lb, ub, by = (ub - lb)/100)
+    qlog_df <- data.frame(dose = fp, response = sapply(fp, function(x) qlogistic(x, alpha, beta1, beta2)))
+    values$qlogistic$drplot <- ggplot(data = qlog_df, aes(x = dose, y = response)) + 
+      geom_line()
+  })
+  
+  output$qlog_plot <- renderPlot({
+    drplot = values$qlogistic$drplot
+    drplot
+  }) 
   
   observeEvent(input$qlogistic_pso, {
     waiter5 <- waiter::Waiter$new(
@@ -765,24 +1151,48 @@ server <- function(input, output) {
     iter = input$qlogistic_iter
     ndp = input$qlogistic_dim
     nrep = input$qlogistic_rep
+    bd = input$qlogistic_bd
     
     ql_par <- c(alpha, beta1, beta2)
     psoinfo_ql <- psoinfo_setting(nSwarms = nswarm, Iters = iter)
-    ql_res <- qlogistic_pso_rep(nRep = nrep, nPoints = ndp, parms = ql_par, psoinfo = psoinfo_ql)
+    ql_res <- qlogistic_pso_rep(nRep = nrep, nPoints = ndp, parms = ql_par, 
+                                psoinfo = psoinfo_ql, bound = bd)
 
     values$qlogistic$val = ql_res$result$best_val
-    values$qlogistic$points = ql_res$result$design_points
+    values$qlogistic$exact_design <- ql_res$result$design_points |> table() |> data.frame()
+    colnames(values$qlogistic$exact_design) <- c("Support Points", "Replications")
     values$qlogistic$eff = ql_res$result$efficiency
-    values$qlogistic$approx = ql_res$approximate_design
+    values$qlogistic$approximate_design = ql_res$approximate_design
+    colnames(values$qlogistic$approximate_design) <- c("Support Points", "Weights")
   }
   )
   
   output$qlogistic_out <- renderPrint({
-    cat("Design Points:", values$qlogistic$points, "\n", "\n")
-    cat("Efficiency:", values$qlogistic$eff, "\n", "\n")
+    cat("Exact Design:", "\n")
+    print(values$qlogistic$exact_design, row.names = F)
+    cat("\n","Efficiency: ", values$qlogistic$eff, "\n", "\n", sep = "")
     cat("Approximate Design:", "\n")
-    print(values$qlogistic$approx)
+    print(values$qlogistic$approximate_design, row.names = F)
   })
+  
+  observeEvent(input$clog_plot_response, {
+    alpha = input$clogistic_a
+    beta1 = input$clogistic_b1
+    beta2 = input$clogistic_b2
+    beta3 = input$clogistic_b3
+    lb = input$clogistic_bd * -1
+    ub = input$clogistic_bd
+    
+    fp <- seq(lb, ub, by = (ub - lb)/100)
+    clog_df <- data.frame(dose = fp, response = sapply(fp, function(x) clogistic(x, alpha, beta1, beta2, beta3)))
+    values$clogistic$drplot <- ggplot(data = clog_df, aes(x = dose, y = response)) + 
+      geom_line()
+  })
+  
+  output$clog_plot <- renderPlot({
+    drplot = values$clogistic$drplot
+    drplot
+  }) 
   
   observeEvent(input$clogistic_pso, {
     waiter6 <- waiter::Waiter$new(
@@ -801,23 +1211,28 @@ server <- function(input, output) {
     iter = input$clogistic_iter
     ndp = input$clogistic_dim
     nrep = input$clogistic_rep
+    bd = input$clogistic_bd
     
     cl_par <- c(alpha, beta1, beta2, beta3)
     psoinfo_cl <- psoinfo_setting(nSwarms = nswarm, Iters = iter)
-    cl_res <- clogistic_pso_rep(nRep = nrep, nPoints = ndp, parms = cl_par, psoinfo = psoinfo_cl)
+    cl_res <- clogistic_pso_rep(nRep = nrep, nPoints = ndp, parms = cl_par, 
+                                psoinfo = psoinfo_cl, bound = bd)
     
     values$clogistic$val = cl_res$result$best_val
-    values$clogistic$points = cl_res$result$design_points
+    values$clogistic$exact_design <- cl_res$result$design_points |> table() |> data.frame()
+    colnames(values$clogistic$exact_design) <- c("Support Points", "Replications")
     values$clogistic$eff = cl_res$result$efficiency
-    values$clogistic$approx = cl_res$approximate_design
+    values$clogistic$approximate_design = cl_res$approximate_design
+    colnames(values$clogistic$approximate_design) <- c("Support Points", "Weights")
   }
   )
   
   output$clogistic_out <- renderPrint({
-    cat("Design Points:", values$clogistic$points, "\n", "\n")
-    cat("Efficiency:", values$clogistic$eff, "\n", "\n")
+    cat("Exact Design:", "\n")
+    print(values$clogistic$exact_design, row.names = F)
+    cat("\n","Efficiency:", values$clogistic$eff, "\n", "\n", sep = "")
     cat("Approximate Design:", "\n")
-    print(values$clogistic$approx)
+    print(values$clogistic$approximate_design, row.names = F)
   })
 }
 
@@ -836,9 +1251,17 @@ hb_parms <- function(c1, tau, b0, b1){
   c(c1, tau, b0, b1)
 }
 
+# Hunt-Bowman function
+hunt_bowman <- function(d, c1, tau, b0, b1){
+  if (d <= tau){
+    res = c1 * d^2 - c1 * tau * d + 1 / (1 + exp(b0))
+  } else {
+    res = 1 / (1 + exp(b0 - b1 * (d - tau)))
+  }
+}
+
 # Hunt-Bowman information matrix
 hb_mat <- function(d, c1, tau, b0, b1){
-  
   if (d <= tau){
     f1 <- d^2 - tau * d
     f2 <- -c1 * d
@@ -870,7 +1293,6 @@ hb_doptimal <- function(d, loc){
   b1 <- loc[4]
   
   # Number of experiment points
-  d <- c(0, d)
   n <- length(d)
   
   # Evaluate d-optimality criterion value
@@ -880,11 +1302,11 @@ hb_doptimal <- function(d, loc){
 }
 
 # Find the D-optimal exact design for Hunt-Bowman model
-hb_doptimal_pso <- function(nPoints, parms, psoinfo){
+hb_doptimal_pso <- function(nPoints, parms, psoinfo, upper){
   
   # set the lower and upper bounds for PSO
-  lb <- rep(0, nPoints-1)
-  ub <- rep(0.15, nPoints-1)
+  lb <- rep(0, nPoints)
+  ub <- rep(upper, nPoints)
   
   #run PSO
   pso_res <- globpso(objFunc = hb_doptimal, 
@@ -893,27 +1315,27 @@ hb_doptimal_pso <- function(nPoints, parms, psoinfo){
                      loc = parms)
   
   pso_res$val <- -1 * pso_res$val
-  pso_res$par <- c(0, pso_res$par) |> sort() |> round(4)
+  pso_res$par <- pso_res$par |> sort() |> round(4)
   pso_res$history <- pso_res$history * -1
   pso_res
 }
 
 # Find D-optimal approximate design for the Hunt-Bowman model
-hb_doptimal_approx <- function(parms){
-  psoinfo <- psoinfo_setting()
-  approx_design <- hb_doptimal_pso(nPoints = 4, parms, psoinfo)
+hb_doptimal_approx <- function(parms, ub){
+  psoinfo <- psoinfo_setting(Iters = 400)
+  approx_design <- hb_doptimal_pso(nPoints = 4, parms, psoinfo, ub)
   approx_design
 }
 
 # Replicate m PSO results of the D-optimal exact design for Hunt-Bowman model
-hb_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+hb_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   
   # The D-optimal approximate design for the Hunt-Bowman model under certain parameter set.
-  approx_design <- hb_doptimal_approx(parms)
+  approx_design <- hb_doptimal_approx(parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_doptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_doptimal_pso(nPoints, parms, psoinfo, upper))
   
   hb_list <- list(val = c(), design_points = c(),  
                   result = list(best_val = 0, efficiency = 0), 
@@ -963,9 +1385,9 @@ hb_tauoptimal <- function(d, loc){
 }
 
 # Find tau-optimal exact design for the Hunt-Bowman model
-hb_tauoptimal_pso <- function(nPoints, parms, psoinfo){
+hb_tauoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   lb <- rep(0, nPoints)
-  ub <- rep(0.15, nPoints)
+  ub <- rep(upper, nPoints)
   
   pso_res <- globpso(objFunc = hb_tauoptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -975,21 +1397,21 @@ hb_tauoptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find tau-optimal approximate design for the Hunt-Bowman model
-hb_tauoptimal_approx <- function(parms){
+hb_tauoptimal_approx <- function(parms, upper){
   psoinfo <- psoinfo_setting()
-  approx_design <- hb_tauoptimal_pso(nPoints = 2, parms, psoinfo)
+  approx_design <- hb_tauoptimal_pso(nPoints = 2, parms, psoinfo, upper)
   approx_design
 }
 
 # Replicate m PSO results of the tau-optimal exact design for Hunt-Bowman model
-hb_tauoptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
+hb_tauoptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo, upper){
   
   # The tau-optimal approximate design for the Hunt-Bowman model under certain parameter set.
-  approx_design <- hb_tauoptimal_approx(parms)
+  approx_design <- hb_tauoptimal_approx(parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_tauoptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_tauoptimal_pso(nPoints, parms, psoinfo, upper))
   
   hb_list <- list(val = c(), design_points = c(), history = c(), 
                   result = list(best_val = 0), 
@@ -1066,9 +1488,9 @@ hb_hoptimal_approx <- function(input, loc){
 }
 
 # Find h-optimal exact design for the Hunt-Bowman model
-hb_hoptimal_pso <- function(nPoints, parms, psoinfo){
+hb_hoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   lb <- rep(0, nPoints)
-  ub <- rep(0.15, nPoints)
+  ub <- rep(upper, nPoints)
   
   pso_res <- globpso(objFunc = hb_hoptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -1078,10 +1500,10 @@ hb_hoptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find h-optimal approximate design for the Hunt-Bowman model
-hb_hoptimal_approx_pso <- function(nPoints, parms){
+hb_hoptimal_approx_pso <- function(nPoints, parms, upper){
   psoinfo <- psoinfo_setting(nSwarms = 256, Iters = 3000)
   lb <- rep(0, 2 * nPoints - 1)
-  ub <- c(rep(0.15, nPoints), rep(1, nPoints - 1))
+  ub <- c(rep(upper, nPoints), rep(1, nPoints - 1))
   
   pso_res <- globpso(objFunc = hb_hoptimal_approx, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -1092,14 +1514,14 @@ hb_hoptimal_approx_pso <- function(nPoints, parms){
 }
 
 # Replicate m PSO results of the h-optimal exact design for Hunt-Bowman model
-hb_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+hb_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   
   # The h-optimal approximate design for the Hunt-Bowman model under certain parameter set.
-  approx_design <- hb_hoptimal_approx_pso(nPoints = 4, parms = parms)
+  approx_design <- hb_hoptimal_approx_pso(nPoints = 4, parms = parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_hoptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_hoptimal_pso(nPoints, parms, psoinfo, upper))
   
   hb_list <- list(val = c(), design_points = c(), history = c(), 
                   result = list(best_val = 0), 
@@ -1108,6 +1530,15 @@ hb_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
   hb_list$approximate_design <- hb_list$approximate_design %>% arrange(support_points)
   idx0 <- print(match(0, hb_list$approximate_design$weight, -1))
   if (idx0 != -1) hb_list$approximate_design <- hb_list$approximate_design[-idx0, ]
+  
+  if (nrow(hb_list$approximate_design) != length(unique(hb_list$approximate_design$support_points))){
+    cnt <- hb_list$approximate_design |> count(support_points)
+    ext <- cnt$support_points[which(cnt$n != 1)]
+    apprep <- hb_list$approximate_design$support_points == ext
+    w <- sum(hb_list$approximate_design$weight[apprep])
+    hb_list$approximate_design <- hb_list$approximate_design[!apprep,]
+    hb_list$approximate_design <- rbind(hb_list$approximate_design, c(ext, w))
+  }
   
   # Criterion value of each replication.
   hb_list$val <- sapply(1:nRep, function(x) pso_results[[x]]$val) 
@@ -1131,6 +1562,11 @@ hb_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
 # exp-log model parameters
 exp_log_params <- function(c0, c1, b0, b1){
   c(c0, c1, b0, b1)
+}
+
+# exp-log function
+exp_log <- function(d, c0, c1, b0, b1){
+  c0 * exp(-c1 * d) + 1 / (1 + exp(b0 - b1 * d))
 }
 
 # exp-log model information matrix
@@ -1167,9 +1603,9 @@ exp_log_doptimal <- function(d, loc){
 }
 
 # Find D-optimal exact design for the exp-log model
-exp_log_doptimal_pso <- function(nPoints, parms, psoinfo){
+exp_log_doptimal_pso <- function(nPoints, parms, psoinfo, upper){
   lb <- rep(0, nPoints)
-  ub <- rep(0.15, nPoints)
+  ub <- rep(upper, nPoints)
   
   pso_res <- globpso(objFunc = exp_log_doptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -1180,21 +1616,21 @@ exp_log_doptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find D-optimal approximate design for the exp-log model
-exp_log_doptimal_approx <- function(parms){
+exp_log_doptimal_approx <- function(parms, upper){
   psoinfo <- psoinfo_setting()
-  approx_design <- exp_log_doptimal_pso(nPoints = 4, parms, psoinfo)
+  approx_design <- exp_log_doptimal_pso(nPoints = 4, parms, psoinfo, upper)
   approx_design
 }
 
 # Replicate m PSO results of the D-optimal exact design for exp-log model
-exp_log_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+exp_log_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   
   # The D-optimal approximate design for the exp-log model under certain parameter set.
-  approx_design <- exp_log_doptimal_approx(parms)
+  approx_design <- exp_log_doptimal_approx(parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_doptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_doptimal_pso(nPoints, parms, psoinfo, upper))
   
   exp_log_list <- list(val = c(), design_points = c(), history = c(), 
                        result = list(best_val = 0), 
@@ -1280,10 +1716,10 @@ exp_log_hoptimal_approx <- function(input, loc){
 }
 
 # Find h-optimal exact design for the exp-log model
-exp_log_hoptimal_pso <- function(nPoints, parms, psoinfo){
+exp_log_hoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   
   lb <- rep(0, nPoints)
-  ub <- rep(0.15, nPoints)
+  ub <- rep(upper, nPoints)
   
   pso_res <- globpso(objFunc = exp_log_hoptimal, 
                      lower = lb, upper = ub, 
@@ -1297,10 +1733,10 @@ exp_log_hoptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find h-optimal approximate design for the exp-log model
-exp_log_hoptimal_approx_pso <- function(nPoints, parms){
+exp_log_hoptimal_approx_pso <- function(nPoints, parms, upper){
   psoinfo <- psoinfo_setting(nSwarms = 256, Iters = 2000)
   lb <- rep(0, 2 * nPoints - 1)
-  ub <- c(rep(0.15, nPoints), rep(1, nPoints - 1))
+  ub <- c(rep(upper, nPoints), rep(1, nPoints - 1))
   
   pso_res <- globpso(objFunc = exp_log_hoptimal_approx, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -1311,14 +1747,14 @@ exp_log_hoptimal_approx_pso <- function(nPoints, parms){
 }
 
 # Replicate m PSO results of the h-optimal exact design for exp-log model
-exp_log_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+exp_log_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   
   # The h-optimal approximate design for the exp-log model under certain parameter set.
-  approx_design <- exp_log_hoptimal_approx_pso(4, parms)
+  approx_design <- exp_log_hoptimal_approx_pso(4, parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_hoptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_hoptimal_pso(nPoints, parms, psoinfo, upper))
   
   exp_log_list <- list(val = c(), design_points = c(), history = c(), 
                        result = list(best_val = 0, design_points = c()), 
@@ -1373,7 +1809,7 @@ exp_log_tauoptimal <- function(d, loc){
   
   b <- exp_log_b(tau, c0, c1, b0, b1)
   
-  M <- exp_log_loc_mat(d, w, c0, c1, b0, b1)
+  M <- exp_log_mat(d, c0, c1, b0, b1)
   if (rcond(M) < 2.220446e-16){
     res = pen
   }
@@ -1386,10 +1822,10 @@ exp_log_tauoptimal <- function(d, loc){
 }
 
 # Find tau-optimal exact design for the exp-log model
-exp_log_tauoptimal_pso <- function(nPoints, parms, psoinfo){
+exp_log_tauoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   
   lb <- c(rep(0, nPoints))
-  ub <- c(rep(0.15, nPoints))
+  ub <- c(rep(upper, nPoints))
   # Evaluate the tau value
   tau <- uniroot(tau_func, c(0.00001, 0.15), tol = 1e-10, 
                  c0 = parms[1], c1 = parms[2], b0 = parms[3], b1 = parms[4])$root
@@ -1405,21 +1841,21 @@ exp_log_tauoptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find tau-optimal approximate design for the exp-log model
-exp_log_tauoptimal_approx <- function(parms){
+exp_log_tauoptimal_approx <- function(parms, upper){
   psoinfo <- psoinfo_setting()
-  approx_design <- exp_log_tauoptimal_pso(nPoints = 2, parms, psoinfo)
+  approx_design <- exp_log_tauoptimal_pso(nPoints = 2, parms, psoinfo, upper)
   approx_design
 }
 
 # Replicate m PSO results of the tau-optimal exact design for exp-log model
-exp_log_tauoptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
+exp_log_tauoptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo, upper){
   
   # The tau-optimal approximate design for the exp-log model under certain parameter set.
-  approx_design <- exp_log_tauoptimal_approx(parms)
+  approx_design <- exp_log_tauoptimal_approx(parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_tauoptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_tauoptimal_pso(nPoints, parms, psoinfo, upper))
   
   exp_log_list <- list(val = c(), design_points = c(), history = c(), 
                        result = list(best_val = 0, design_points = c()), 
@@ -1448,6 +1884,11 @@ logistic_params <- function(alpha, beta){
   c(alpha, beta)
 }
 
+logistic <- function(d, alpha, beta){
+  eta <- alpha + beta * d
+  exp(eta) / (1 + exp(eta))
+}
+
 logistic_doptimal <- function(d, loc){
   a <- loc[1]
   b <- loc[2]
@@ -1461,9 +1902,9 @@ logistic_doptimal <- function(d, loc){
 }
 
 # Find D-optimal exact design for the simple logistic model
-logistic_doptimal_pso <- function(nPoints, parms, psoinfo){
-  lb <- rep(-10, nPoints)
-  ub <- rep(10, nPoints)
+logistic_doptimal_pso <- function(nPoints, parms, psoinfo, bd){
+  lb <- rep(-1 * bd, nPoints)
+  ub <- rep(bd, nPoints)
   
   pso_res <- globpso(objFunc = logistic_doptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -1474,21 +1915,21 @@ logistic_doptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find D-optimal approximate design for the simple logistic model
-logistic_doptimal_approx <- function(parms){
+logistic_doptimal_approx <- function(parms, bound){
   psoinfo <- psoinfo_setting()
-  approx_design <- logistic_doptimal_pso(nPoints = 2, parms, psoinfo)
+  approx_design <- logistic_doptimal_pso(nPoints = 2, parms, psoinfo, bound)
   approx_design
 }
 
 # Replicate m PSO results of the D-optimal exact design for simple logistic model
-logistic_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
+logistic_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo, bound){
   
   # The D-optimal approximate design for the simple logistic model under certain parameter set.
-  approx_design <- logistic_doptimal_approx(parms)
+  approx_design <- logistic_doptimal_approx(parms, bound)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- logistic_d_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- logistic_doptimal_pso(nPoints, parms, psoinfo, bound))
   
   logistic_list <- list(design_points = c(), val = c(), 
                         result = list(best_val = 0, design_points = c(), efficiency = 0), 
@@ -1513,6 +1954,11 @@ logistic_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
 ## Quadratic logistic D-optimal
 qlogistic_params <- function(alpha, beta1, beta2){
   c(alpha, beta1, beta2)
+}
+
+qlogistic <- function(d, alpha, beta1, beta2){
+  eta <- alpha + beta1 * d + beta2 * d^2
+  exp(eta) / (1 + exp(eta))
 }
 
 qlogistic_doptimal <- function(d, loc){
@@ -1561,9 +2007,9 @@ qlogistic_doptimal_approx <- function(input, loc){
 }
 
 # Find D-optimal exact design for the quadratic logistic model
-qlogistic_pso <- function(nPoints, parms, psoinfo){
-  lb <- rep(-10, nPoints)
-  ub <- rep(10, nPoints)
+qlogistic_pso <- function(nPoints, parms, psoinfo, bd){
+  lb <- rep(-1 * bd, nPoints)
+  ub <- rep(bd, nPoints)
   
   pso_res <- globpso(objFunc = qlogistic_doptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -1574,9 +2020,9 @@ qlogistic_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find D-optimal approximate design for the quadratic logistic model
-qlogistic_approx_pso <- function(parms){
-  lb <- c(rep(-10, 4), rep(0, 3))
-  ub <- c(rep(10, 4), rep(1, 3))
+qlogistic_approx_pso <- function(parms, bd){
+  lb <- c(rep(-1 * bd, 4), rep(0, 3))
+  ub <- c(rep(bd, 4), rep(1, 3))
   psoinfo <- psoinfo_setting()
   
   pso_res <- globpso(objFunc = qlogistic_doptimal_approx, lower = lb, upper = ub, 
@@ -1588,14 +2034,14 @@ qlogistic_approx_pso <- function(parms){
 }
 
 # Replicate m PSO results of the D-optimal exact design for quadratic logistic model
-qlogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+qlogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, bound){
   
   # The D-optimal approximate design for the quadratic logistic model under certain parameter set.
-  approx_design <- qlogistic_approx_pso(parms)
+  approx_design <- qlogistic_approx_pso(parms, bound)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- qlogistic_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- qlogistic_pso(nPoints, parms, psoinfo, bound))
   
   qlogistic_list <- list(design_points = c(), val = c())
   # Criterion value of each replication.
@@ -1609,6 +2055,15 @@ qlogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
   qlogistic_list$approximate_design <- qlogistic_list$approximate_design %>% arrange(support_points)
   idx0 <- match(0, qlogistic_list$approximate_design$weight, -1)
   if (idx0 != -1) qlogistic_list$approximate_design <- qlogistic_list$approximate_design[-idx0, ]
+  
+  if (nrow(qlogistic_list$approximate_design) != length(unique(qlogistic_list$approximate_design$support_points))){
+    cnt <- qlogistic_list$approximate_design |> count(support_points)
+    ext <- cnt$support_points[which(cnt$n != 1)]
+    apprep <- qlogistic_list$approximate_design$support_points == ext
+    w <- sum(qlogistic_list$approximate_design$weight[apprep])
+    qlogistic_list$approximate_design <- qlogistic_list$approximate_design[!apprep,]
+    qlogistic_list$approximate_design <- rbind(qlogistic_list$approximate_design, c(ext, w))
+  }
   
   best_idx <- which.max(qlogistic_list$val)
   # Best criterion value among all replications.
@@ -1625,6 +2080,11 @@ qlogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
 ## Cubic logistic models
 clogistic_params <- function(alpha, beta1, beta2, beta3){
   c(alpha, beta1, beta2, beta3)
+}
+
+clogistic <- function(d, alpha, beta1, beta2, beta3){
+  eta <- alpha + beta1 * d + beta2 * d^2 + beta3 * d^3
+  exp(eta) / (1 + exp(eta))
 }
 
 clogistic_doptimal <- function(d, loc){
@@ -1681,9 +2141,9 @@ clogistic_doptimal_approx <- function(input, loc){
 }
 
 # Find D-optimal exact design for the cubic logistic model
-clogistic_pso <- function(npoints, parms, psoinfo){
-  lb <- rep(-5, npoints)
-  ub <- rep(5, npoints)
+clogistic_pso <- function(npoints, parms, psoinfo, bd){
+  lb <- rep(-1 * bd, npoints)
+  ub <- rep(bd, npoints)
   
   pso_res <- globpso(objFunc = clogistic_doptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -1694,9 +2154,9 @@ clogistic_pso <- function(npoints, parms, psoinfo){
 }
 
 # Find D-optimal approximate design for the cubic logistic model
-clogistic_approx_pso <- function(parms){
-  lb <- c(rep(-5, 5), rep(0, 4))
-  ub <- c(rep(5, 5), rep(1, 4))
+clogistic_approx_pso <- function(parms, bd){
+  lb <- c(rep(-1 * bd, 5), rep(0, 4))
+  ub <- c(rep(bd, 5), rep(1, 4))
   psoinfo <- psoinfo_setting()
   
   pso_res <- globpso(objFunc = clogistic_doptimal_approx, lower = lb, upper = ub, 
@@ -1708,14 +2168,14 @@ clogistic_approx_pso <- function(parms){
 }
 
 # Replicate m PSO results of the D-optimal exact design for cubic logistic model
-clogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+clogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, bound){
   
   # The D-optimal approximate design for the cubic logistic model under certain parameter set.
-  approx_design <- clogistic_approx_pso(parms)
+  approx_design <- clogistic_approx_pso(parms, bound)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- clogistic_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- clogistic_pso(nPoints, parms, psoinfo, bound))
   
   clogistic_list <- list(design_points = c(), val = c())
   # Criterion value of each replication.
@@ -1728,6 +2188,15 @@ clogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
   clogistic_list$approximate_design <- clogistic_list$approximate_design %>% arrange(support_points)
   idx0 <- match(0, clogistic_list$approximate_design$weight, -1)
   if (idx0 != -1) clogistic_list$approximate_design <- clogistic_list$approximate_design[-idx0, ]
+  
+  if (nrow(clogistic_list$approximate_design) != length(unique(clogistic_list$approximate_design$support_points))){
+    cnt <- clogistic_list$approximate_design |> count(support_points)
+    ext <- cnt$support_points[which(cnt$n != 1)]
+    apprep <- clogistic_list$approximate_design$support_points == ext
+    w <- sum(clogistic_list$approximate_design$weight[apprep])
+    clogistic_list$approximate_design <- clogistic_list$approximate_design[!apprep,]
+    clogistic_list$approximate_design <- rbind(clogistic_list$approximate_design, c(ext, w))
+  }
   
   best_idx <- which.max(clogistic_list$val)
   # Best criterion value among all replications.

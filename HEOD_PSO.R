@@ -1,6 +1,3 @@
-library(globpso)
-library(dplyr)
-
 ## Initalize PSO settings
 
 psoinfo_setting <- function(nSwarms = 64, Iters = 1000){
@@ -14,9 +11,30 @@ hb_parms <- function(c1, tau, b0, b1){
   c(c1, tau, b0, b1)
 }
 
+# Hunt-Bowman function
+hunt_bowman <- function(d, c1, tau, b0, b1){
+  if (d <= tau){
+    res = c1 * d^2 - c1 * tau * d + 1 / (1 + exp(b0))
+  } else {
+    res = 1 / (1 + exp(b0 - b1 * (d - tau)))
+  }
+}
+
+# Dose-response plot for Hunt-Bowman models
+hunt_bowman_plot <- function(parms, upper_bound){
+  c1 = parms[1]
+  tau = parms[2]
+  b0 = parms[3]
+  b1 = parms[4]
+  
+  fp <- seq(0, upper_bound, by = (upper_bound - 0)/100)
+  hb_df <- data.frame(dose = fp, response = sapply(fp, function(x) hunt_bowman(x, c1, tau, b0, b1)))
+  ggplot(data = hb_df, aes(x = dose, y = response)) + 
+    geom_line()
+}
+
 # Hunt-Bowman information matrix
 hb_mat <- function(d, c1, tau, b0, b1){
-  
   if (d <= tau){
     f1 <- d^2 - tau * d
     f2 <- -c1 * d
@@ -48,7 +66,6 @@ hb_doptimal <- function(d, loc){
   b1 <- loc[4]
   
   # Number of experiment points
-  d <- c(0, d)
   n <- length(d)
   
   # Evaluate d-optimality criterion value
@@ -58,11 +75,11 @@ hb_doptimal <- function(d, loc){
 }
 
 # Find the D-optimal exact design for Hunt-Bowman model
-hb_doptimal_pso <- function(nPoints, parms, psoinfo){
+hb_doptimal_pso <- function(nPoints, parms, psoinfo, upper){
   
   # set the lower and upper bounds for PSO
-  lb <- rep(0, nPoints-1)
-  ub <- rep(0.15, nPoints-1)
+  lb <- rep(0, nPoints)
+  ub <- rep(upper, nPoints)
   
   #run PSO
   pso_res <- globpso(objFunc = hb_doptimal, 
@@ -71,27 +88,27 @@ hb_doptimal_pso <- function(nPoints, parms, psoinfo){
                      loc = parms)
   
   pso_res$val <- -1 * pso_res$val
-  pso_res$par <- c(0, pso_res$par) |> sort() |> round(4)
+  pso_res$par <- pso_res$par |> sort() |> round(4)
   pso_res$history <- pso_res$history * -1
   pso_res
 }
 
 # Find D-optimal approximate design for the Hunt-Bowman model
-hb_doptimal_approx <- function(parms){
-  psoinfo <- psoinfo_setting()
-  approx_design <- hb_doptimal_pso(nPoints = 4, parms, psoinfo)
+hb_doptimal_approx <- function(parms, ub){
+  psoinfo <- psoinfo_setting(Iters = 400)
+  approx_design <- hb_doptimal_pso(nPoints = 4, parms, psoinfo, ub)
   approx_design
 }
 
 # Replicate m PSO results of the D-optimal exact design for Hunt-Bowman model
-hb_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+hb_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   
   # The D-optimal approximate design for the Hunt-Bowman model under certain parameter set.
-  approx_design <- hb_doptimal_approx(parms)
+  approx_design <- hb_doptimal_approx(parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_doptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_doptimal_pso(nPoints, parms, psoinfo, upper))
   
   hb_list <- list(val = c(), design_points = c(),  
                   result = list(best_val = 0, efficiency = 0), 
@@ -141,9 +158,9 @@ hb_tauoptimal <- function(d, loc){
 }
 
 # Find tau-optimal exact design for the Hunt-Bowman model
-hb_tauoptimal_pso <- function(nPoints, parms, psoinfo){
+hb_tauoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   lb <- rep(0, nPoints)
-  ub <- rep(0.15, nPoints)
+  ub <- rep(upper, nPoints)
   
   pso_res <- globpso(objFunc = hb_tauoptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -153,21 +170,21 @@ hb_tauoptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find tau-optimal approximate design for the Hunt-Bowman model
-hb_tauoptimal_approx <- function(parms){
+hb_tauoptimal_approx <- function(parms, upper){
   psoinfo <- psoinfo_setting()
-  approx_design <- hb_tauoptimal_pso(nPoints = 2, parms, psoinfo)
+  approx_design <- hb_tauoptimal_pso(nPoints = 2, parms, psoinfo, upper)
   approx_design
 }
 
 # Replicate m PSO results of the tau-optimal exact design for Hunt-Bowman model
-hb_tauoptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
+hb_tauoptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo, upper){
   
   # The tau-optimal approximate design for the Hunt-Bowman model under certain parameter set.
-  approx_design <- hb_tauoptimal_approx(parms)
+  approx_design <- hb_tauoptimal_approx(parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_tauoptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_tauoptimal_pso(nPoints, parms, psoinfo, upper))
   
   hb_list <- list(val = c(), design_points = c(), history = c(), 
                   result = list(best_val = 0), 
@@ -244,9 +261,9 @@ hb_hoptimal_approx <- function(input, loc){
 }
 
 # Find h-optimal exact design for the Hunt-Bowman model
-hb_hoptimal_pso <- function(nPoints, parms, psoinfo){
+hb_hoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   lb <- rep(0, nPoints)
-  ub <- rep(0.15, nPoints)
+  ub <- rep(upper, nPoints)
   
   pso_res <- globpso(objFunc = hb_hoptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -256,10 +273,10 @@ hb_hoptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find h-optimal approximate design for the Hunt-Bowman model
-hb_hoptimal_approx_pso <- function(nPoints, parms){
+hb_hoptimal_approx_pso <- function(nPoints, parms, upper){
   psoinfo <- psoinfo_setting(nSwarms = 256, Iters = 3000)
   lb <- rep(0, 2 * nPoints - 1)
-  ub <- c(rep(0.15, nPoints), rep(1, nPoints - 1))
+  ub <- c(rep(upper, nPoints), rep(1, nPoints - 1))
   
   pso_res <- globpso(objFunc = hb_hoptimal_approx, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -270,22 +287,31 @@ hb_hoptimal_approx_pso <- function(nPoints, parms){
 }
 
 # Replicate m PSO results of the h-optimal exact design for Hunt-Bowman model
-hb_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+hb_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   
   # The h-optimal approximate design for the Hunt-Bowman model under certain parameter set.
-  approx_design <- hb_hoptimal_approx_pso(nPoints = 4, parms = parms)
+  approx_design <- hb_hoptimal_approx_pso(nPoints = 4, parms = parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_hoptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_hoptimal_pso(nPoints, parms, psoinfo, upper))
   
   hb_list <- list(val = c(), design_points = c(), history = c(), 
                   result = list(best_val = 0), 
                   approximate_design = data.frame(support_points = approx_design$par[1:4], 
-                                                 weight = approx_design$par[5:8]))
+                                                  weight = approx_design$par[5:8]))
   hb_list$approximate_design <- hb_list$approximate_design %>% arrange(support_points)
   idx0 <- print(match(0, hb_list$approximate_design$weight, -1))
   if (idx0 != -1) hb_list$approximate_design <- hb_list$approximate_design[-idx0, ]
+  
+  if (nrow(hb_list$approximate_design) != length(unique(hb_list$approximate_design$support_points))){
+    cnt <- hb_list$approximate_design |> count(support_points)
+    ext <- cnt$support_points[which(cnt$n != 1)]
+    apprep <- hb_list$approximate_design$support_points == ext
+    w <- sum(hb_list$approximate_design$weight[apprep])
+    hb_list$approximate_design <- hb_list$approximate_design[!apprep,]
+    hb_list$approximate_design <- rbind(hb_list$approximate_design, c(ext, w))
+  }
   
   # Criterion value of each replication.
   hb_list$val <- sapply(1:nRep, function(x) pso_results[[x]]$val) 
@@ -311,6 +337,24 @@ exp_log_params <- function(c0, c1, b0, b1){
   c(c0, c1, b0, b1)
 }
 
+# exp-log function
+exp_log <- function(d, c0, c1, b0, b1){
+  c0 * exp(-c1 * d) + 1 / (1 + exp(b0 - b1 * d))
+}
+
+# Dose-response plot for exp-log models
+exp_log_plot <- function(parms, upper_bound){
+  c0 = parms[1]
+  c1 = parms[2]
+  b0 = parms[3]
+  b1 = parms[4]
+  
+  fp <- seq(0, upper_bound, by = (upper_bound - 0)/100)
+  el_df <- data.frame(dose = fp, response = sapply(fp, function(x) exp_log(x, c0, c1, b0, b1)))
+  ggplot(data = el_df, aes(x = dose, y = response)) + 
+    geom_line()
+}
+
 # exp-log model information matrix
 exp_log_f <- function(d, c0, c1, b0, b1){
   f1 <- exp(-c1 * d)
@@ -325,7 +369,7 @@ exp_log_mat <- function(d, c0, c1, b0, b1){
   #d <- c(0, d)
   n <- length(d)
   mat_list <- lapply(d, function(x) 1/n * exp_log_f(x, c0, c1, b0, b1))
-
+  
   #print(mat_list)
   M <- Reduce("+", mat_list)
   diag(M) <- diag(M) + 1e-10
@@ -345,9 +389,9 @@ exp_log_doptimal <- function(d, loc){
 }
 
 # Find D-optimal exact design for the exp-log model
-exp_log_doptimal_pso <- function(nPoints, parms, psoinfo){
+exp_log_doptimal_pso <- function(nPoints, parms, psoinfo, upper){
   lb <- rep(0, nPoints)
-  ub <- rep(0.15, nPoints)
+  ub <- rep(upper, nPoints)
   
   pso_res <- globpso(objFunc = exp_log_doptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -358,21 +402,21 @@ exp_log_doptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find D-optimal approximate design for the exp-log model
-exp_log_doptimal_approx <- function(parms){
+exp_log_doptimal_approx <- function(parms, upper){
   psoinfo <- psoinfo_setting()
-  approx_design <- exp_log_doptimal_pso(nPoints = 4, parms, psoinfo)
+  approx_design <- exp_log_doptimal_pso(nPoints = 4, parms, psoinfo, upper)
   approx_design
 }
 
 # Replicate m PSO results of the D-optimal exact design for exp-log model
-exp_log_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+exp_log_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   
   # The D-optimal approximate design for the exp-log model under certain parameter set.
-  approx_design <- exp_log_doptimal_approx(parms)
+  approx_design <- exp_log_doptimal_approx(parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_doptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_doptimal_pso(nPoints, parms, psoinfo, upper))
   
   exp_log_list <- list(val = c(), design_points = c(), history = c(), 
                        result = list(best_val = 0), 
@@ -403,7 +447,7 @@ exp_log_hoptimal <- function(d, loc){
   b0 = loc[3]
   b1 = loc[4]
   pen = 999999999 # Penalty value
-
+  
   n <- length(d)
   h1 <- -c1
   h2 <- -c0
@@ -412,7 +456,7 @@ exp_log_hoptimal <- function(d, loc){
   h <- matrix(c(h1, h2, h3, h4))
   
   M <- exp_log_mat(d, c0, c1, b0, b1)
-
+  
   if (rcond(M) < 2.220446e-16){
     res = pen
   }
@@ -420,7 +464,7 @@ exp_log_hoptimal <- function(d, loc){
     M_inv <- solve(M)
     res = t(h) %*% M_inv %*% h
   }
-
+  
   res
 }
 
@@ -458,10 +502,10 @@ exp_log_hoptimal_approx <- function(input, loc){
 }
 
 # Find h-optimal exact design for the exp-log model
-exp_log_hoptimal_pso <- function(nPoints, parms, psoinfo){
+exp_log_hoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   
   lb <- rep(0, nPoints)
-  ub <- rep(0.15, nPoints)
+  ub <- rep(upper, nPoints)
   
   pso_res <- globpso(objFunc = exp_log_hoptimal, 
                      lower = lb, upper = ub, 
@@ -475,10 +519,10 @@ exp_log_hoptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find h-optimal approximate design for the exp-log model
-exp_log_hoptimal_approx_pso <- function(nPoints, parms){
+exp_log_hoptimal_approx_pso <- function(nPoints, parms, upper){
   psoinfo <- psoinfo_setting(nSwarms = 256, Iters = 2000)
   lb <- rep(0, 2 * nPoints - 1)
-  ub <- c(rep(0.15, nPoints), rep(1, nPoints - 1))
+  ub <- c(rep(upper, nPoints), rep(1, nPoints - 1))
   
   pso_res <- globpso(objFunc = exp_log_hoptimal_approx, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -489,14 +533,14 @@ exp_log_hoptimal_approx_pso <- function(nPoints, parms){
 }
 
 # Replicate m PSO results of the h-optimal exact design for exp-log model
-exp_log_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+exp_log_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   
   # The h-optimal approximate design for the exp-log model under certain parameter set.
-  approx_design <- exp_log_hoptimal_approx_pso(4, parms)
+  approx_design <- exp_log_hoptimal_approx_pso(4, parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_hoptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_hoptimal_pso(nPoints, parms, psoinfo, upper))
   
   exp_log_list <- list(val = c(), design_points = c(), history = c(), 
                        result = list(best_val = 0, design_points = c()), 
@@ -551,7 +595,7 @@ exp_log_tauoptimal <- function(d, loc){
   
   b <- exp_log_b(tau, c0, c1, b0, b1)
   
-  M <- exp_log_loc_mat(d, w, c0, c1, b0, b1)
+  M <- exp_log_mat(d, c0, c1, b0, b1)
   if (rcond(M) < 2.220446e-16){
     res = pen
   }
@@ -564,10 +608,10 @@ exp_log_tauoptimal <- function(d, loc){
 }
 
 # Find tau-optimal exact design for the exp-log model
-exp_log_tauoptimal_pso <- function(nPoints, parms, psoinfo){
+exp_log_tauoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   
   lb <- c(rep(0, nPoints))
-  ub <- c(rep(0.15, nPoints))
+  ub <- c(rep(upper, nPoints))
   # Evaluate the tau value
   tau <- uniroot(tau_func, c(0.00001, 0.15), tol = 1e-10, 
                  c0 = parms[1], c1 = parms[2], b0 = parms[3], b1 = parms[4])$root
@@ -583,21 +627,21 @@ exp_log_tauoptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find tau-optimal approximate design for the exp-log model
-exp_log_tauoptimal_approx <- function(parms){
+exp_log_tauoptimal_approx <- function(parms, upper){
   psoinfo <- psoinfo_setting()
-  approx_design <- exp_log_tauoptimal_pso(nPoints = 2, parms, psoinfo)
+  approx_design <- exp_log_tauoptimal_pso(nPoints = 2, parms, psoinfo, upper)
   approx_design
 }
 
 # Replicate m PSO results of the tau-optimal exact design for exp-log model
-exp_log_tauoptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
+exp_log_tauoptimal_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo, upper){
   
   # The tau-optimal approximate design for the exp-log model under certain parameter set.
-  approx_design <- exp_log_tauoptimal_approx(parms)
+  approx_design <- exp_log_tauoptimal_approx(parms, upper)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_tauoptimal_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- exp_log_tauoptimal_pso(nPoints, parms, psoinfo, upper))
   
   exp_log_list <- list(val = c(), design_points = c(), history = c(), 
                        result = list(best_val = 0, design_points = c()), 
@@ -626,6 +670,24 @@ logistic_params <- function(alpha, beta){
   c(alpha, beta)
 }
 
+logistic <- function(d, alpha, beta){
+  eta <- alpha + beta * d
+  exp(eta) / (1 + exp(eta))
+}
+
+# Dose-response plot for logistic models
+logistic_plot <- function(parms, bound){
+  alpha = parms[1]
+  beta = parms[2]
+  lb = bound * -1
+  ub = bound
+  
+  fp <- seq(lb, ub, by = (ub - lb)/100)
+  log_df <- data.frame(dose = fp, response = sapply(fp, function(x) logistic(x, alpha, beta)))
+  ggplot(data = log_df, aes(x = dose, y = response)) + 
+    geom_line()
+}
+
 logistic_doptimal <- function(d, loc){
   a <- loc[1]
   b <- loc[2]
@@ -639,9 +701,9 @@ logistic_doptimal <- function(d, loc){
 }
 
 # Find D-optimal exact design for the simple logistic model
-logistic_doptimal_pso <- function(nPoints, parms, psoinfo){
-  lb <- rep(-10, nPoints)
-  ub <- rep(10, nPoints)
+logistic_doptimal_pso <- function(nPoints, parms, psoinfo, bd){
+  lb <- rep(-1 * bd, nPoints)
+  ub <- rep(bd, nPoints)
   
   pso_res <- globpso(objFunc = logistic_doptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -652,21 +714,21 @@ logistic_doptimal_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find D-optimal approximate design for the simple logistic model
-logistic_doptimal_approx <- function(parms){
+logistic_doptimal_approx <- function(parms, bound){
   psoinfo <- psoinfo_setting()
-  approx_design <- logistic_doptimal_pso(nPoints = 2, parms, psoinfo)
+  approx_design <- logistic_doptimal_pso(nPoints = 2, parms, psoinfo, bound)
   approx_design
 }
 
 # Replicate m PSO results of the D-optimal exact design for simple logistic model
-logistic_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
+logistic_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo, bound){
   
   # The D-optimal approximate design for the simple logistic model under certain parameter set.
-  approx_design <- logistic_doptimal_approx(parms)
+  approx_design <- logistic_doptimal_approx(parms, bound)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- logistic_d_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- logistic_doptimal_pso(nPoints, parms, psoinfo, bound))
   
   logistic_list <- list(design_points = c(), val = c(), 
                         result = list(best_val = 0, design_points = c(), efficiency = 0), 
@@ -691,6 +753,25 @@ logistic_pso_rep <- function(nRep, nPoints = 2, parms, psoinfo){
 ## Quadratic logistic D-optimal
 qlogistic_params <- function(alpha, beta1, beta2){
   c(alpha, beta1, beta2)
+}
+
+qlogistic <- function(d, alpha, beta1, beta2){
+  eta <- alpha + beta1 * d + beta2 * d^2
+  exp(eta) / (1 + exp(eta))
+}
+
+# Dose-response plot for quadratic logistic models
+qlogistic_plot <- function(parms, bound){
+  alpha = parms[1]
+  beta1 = parms[2]
+  beta2 = parms[3]
+  lb = bound * -1
+  ub = bound
+  
+  fp <- seq(lb, ub, by = (ub - lb)/100)
+  qlog_df <- data.frame(dose = fp, response = sapply(fp, function(x) qlogistic(x, alpha, beta1, beta2)))
+  ggplot(data = qlog_df, aes(x = dose, y = response)) + 
+    geom_line()
 }
 
 qlogistic_doptimal <- function(d, loc){
@@ -739,9 +820,9 @@ qlogistic_doptimal_approx <- function(input, loc){
 }
 
 # Find D-optimal exact design for the quadratic logistic model
-qlogistic_pso <- function(nPoints, parms, psoinfo){
-  lb <- rep(-10, nPoints)
-  ub <- rep(10, nPoints)
+qlogistic_pso <- function(nPoints, parms, psoinfo, bd){
+  lb <- rep(-1 * bd, nPoints)
+  ub <- rep(bd, nPoints)
   
   pso_res <- globpso(objFunc = qlogistic_doptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -752,9 +833,9 @@ qlogistic_pso <- function(nPoints, parms, psoinfo){
 }
 
 # Find D-optimal approximate design for the quadratic logistic model
-qlogistic_approx_pso <- function(parms){
-  lb <- c(rep(-10, 4), rep(0, 3))
-  ub <- c(rep(10, 4), rep(1, 3))
+qlogistic_approx_pso <- function(parms, bd){
+  lb <- c(rep(-1 * bd, 4), rep(0, 3))
+  ub <- c(rep(bd, 4), rep(1, 3))
   psoinfo <- psoinfo_setting()
   
   pso_res <- globpso(objFunc = qlogistic_doptimal_approx, lower = lb, upper = ub, 
@@ -764,16 +845,16 @@ qlogistic_approx_pso <- function(parms){
   pso_res$par <- c(pso_res$par, 1 - sum(pso_res$par[5:7])) |> round(4)
   pso_res
 }
- 
+
 # Replicate m PSO results of the D-optimal exact design for quadratic logistic model
-qlogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+qlogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, bound){
   
   # The D-optimal approximate design for the quadratic logistic model under certain parameter set.
-  approx_design <- qlogistic_approx_pso(parms)
+  approx_design <- qlogistic_approx_pso(parms, bound)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- qlogistic_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- qlogistic_pso(nPoints, parms, psoinfo, bound))
   
   qlogistic_list <- list(design_points = c(), val = c())
   # Criterion value of each replication.
@@ -787,6 +868,15 @@ qlogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
   qlogistic_list$approximate_design <- qlogistic_list$approximate_design %>% arrange(support_points)
   idx0 <- match(0, qlogistic_list$approximate_design$weight, -1)
   if (idx0 != -1) qlogistic_list$approximate_design <- qlogistic_list$approximate_design[-idx0, ]
+  
+  if (nrow(qlogistic_list$approximate_design) != length(unique(qlogistic_list$approximate_design$support_points))){
+    cnt <- qlogistic_list$approximate_design |> count(support_points)
+    ext <- cnt$support_points[which(cnt$n != 1)]
+    apprep <- qlogistic_list$approximate_design$support_points == ext
+    w <- sum(qlogistic_list$approximate_design$weight[apprep])
+    qlogistic_list$approximate_design <- qlogistic_list$approximate_design[!apprep,]
+    qlogistic_list$approximate_design <- rbind(qlogistic_list$approximate_design, c(ext, w))
+  }
   
   best_idx <- which.max(qlogistic_list$val)
   # Best criterion value among all replications.
@@ -803,6 +893,26 @@ qlogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
 ## Cubic logistic models
 clogistic_params <- function(alpha, beta1, beta2, beta3){
   c(alpha, beta1, beta2, beta3)
+}
+
+clogistic <- function(d, alpha, beta1, beta2, beta3){
+  eta <- alpha + beta1 * d + beta2 * d^2 + beta3 * d^3
+  exp(eta) / (1 + exp(eta))
+}
+
+# Dose-response plot for cubic logistic models
+clogistic_plot <- function(parms, bound){
+  alpha = parms[1]
+  beta1 = parms[2]
+  beta2 = parms[3]
+  beta3 = parms[4]
+  lb = bound * -1
+  ub = bound
+  
+  fp <- seq(lb, ub, by = (ub - lb)/100)
+  clog_df <- data.frame(dose = fp, response = sapply(fp, function(x) clogistic(x, alpha, beta1, beta2, beta3)))
+  ggplot(data = clog_df, aes(x = dose, y = response)) + 
+    geom_line()
 }
 
 clogistic_doptimal <- function(d, loc){
@@ -833,11 +943,11 @@ clogistic_doptimal_approx <- function(input, loc){
   d <- input[1:5]
   weight <- input[6:9]
   weight[5] <- 1- sum(weight)
-
+  
   
   theta <- a + b1 * d + b2 * d^2 + b3 * d^3
   omega <- exp(theta) / (1 + exp(theta))^2
-
+  
   
   inf_mat <- matrix(c(sum(weight * omega), sum(weight * d * omega), 
                       sum(weight * d^2 * omega), sum(weight * d^3 * omega), 
@@ -859,9 +969,9 @@ clogistic_doptimal_approx <- function(input, loc){
 }
 
 # Find D-optimal exact design for the cubic logistic model
-clogistic_pso <- function(npoints, parms, psoinfo){
-  lb <- rep(-5, npoints)
-  ub <- rep(5, npoints)
+clogistic_pso <- function(npoints, parms, psoinfo, bd){
+  lb <- rep(-1 * bd, npoints)
+  ub <- rep(bd, npoints)
   
   pso_res <- globpso(objFunc = clogistic_doptimal, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
@@ -872,11 +982,11 @@ clogistic_pso <- function(npoints, parms, psoinfo){
 }
 
 # Find D-optimal approximate design for the cubic logistic model
-clogistic_approx_pso <- function(parms){
-  lb <- c(rep(-5, 5), rep(0, 4))
-  ub <- c(rep(5, 5), rep(1, 4))
+clogistic_approx_pso <- function(parms, bd){
+  lb <- c(rep(-1 * bd, 5), rep(0, 4))
+  ub <- c(rep(bd, 5), rep(1, 4))
   psoinfo <- psoinfo_setting()
-
+  
   pso_res <- globpso(objFunc = clogistic_doptimal_approx, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
   
@@ -886,14 +996,14 @@ clogistic_approx_pso <- function(parms){
 }
 
 # Replicate m PSO results of the D-optimal exact design for cubic logistic model
-clogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
+clogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, bound){
   
   # The D-optimal approximate design for the cubic logistic model under certain parameter set.
-  approx_design <- clogistic_approx_pso(parms)
+  approx_design <- clogistic_approx_pso(parms, bound)
   
   # Create nRep replicates of nPoints exact design result found by PSO.
   pso_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- clogistic_pso(nPoints, parms, psoinfo))
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- clogistic_pso(nPoints, parms, psoinfo, bound))
   
   clogistic_list <- list(design_points = c(), val = c())
   # Criterion value of each replication.
@@ -906,6 +1016,15 @@ clogistic_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo){
   clogistic_list$approximate_design <- clogistic_list$approximate_design %>% arrange(support_points)
   idx0 <- match(0, clogistic_list$approximate_design$weight, -1)
   if (idx0 != -1) clogistic_list$approximate_design <- clogistic_list$approximate_design[-idx0, ]
+  
+  if (nrow(clogistic_list$approximate_design) != length(unique(clogistic_list$approximate_design$support_points))){
+    cnt <- clogistic_list$approximate_design |> count(support_points)
+    ext <- cnt$support_points[which(cnt$n != 1)]
+    apprep <- clogistic_list$approximate_design$support_points == ext
+    w <- sum(clogistic_list$approximate_design$weight[apprep])
+    clogistic_list$approximate_design <- clogistic_list$approximate_design[!apprep,]
+    clogistic_list$approximate_design <- rbind(clogistic_list$approximate_design, c(ext, w))
+  }
   
   best_idx <- which.max(clogistic_list$val)
   # Best criterion value among all replications.
