@@ -34,6 +34,47 @@ hunt_bowman_plot <- function(parms, upper_bound){
 }
 
 # Hunt-Bowman information matrix
+hb_f <- function(d, c1, tau, b0, b1){
+  if (d <= tau){
+    f1 <- d^2 - tau * d
+    f2 <- -c1 * d
+    f3 <- -exp(b0) / (1 + exp(b0))^2
+    f4 <- 0
+    f <- matrix(c(f1, f2, f3, f4))
+  } 
+  else if (d > tau){
+    f1 <- 0
+    f2 <- -b1 * exp(b0 - b1 * (d - tau)) / (1 + exp(b0 - b1 * (d - tau)))^2
+    f3 <- -exp(b0 - b1 * (d - tau)) / (1 + exp(b0 - b1 * (d - tau)))^2
+    f4 <- (d - tau) * exp(b0 - b1 * (d - tau)) / (1 + exp(b0 - b1 * (d - tau)))^2
+    f <- matrix(c(f1, f2, f3, f4))
+  }
+  
+  f
+}
+
+hb_grad <- function(d, theta){
+  c1 = theta[1]
+  tau = theta[2]
+  b0 = theta[3]
+  b1 = theta[4]
+  
+  if (d <= tau){
+    f1 <- d^2 - tau * d
+    f2 <- -c1 * d
+    f3 <- -exp(b0) / (1 + exp(b0))^2
+    f4 <- 0
+    return(c(f1, f2, f3, f4))
+  } 
+  else if (d > tau){
+    f1 <- 0
+    f2 <- -b1 * exp(b0 - b1 * (d - tau)) / (1 + exp(b0 - b1 * (d - tau)))^2
+    f3 <- -exp(b0 - b1 * (d - tau)) / (1 + exp(b0 - b1 * (d - tau)))^2
+    f4 <- (d - tau) * exp(b0 - b1 * (d - tau)) / (1 + exp(b0 - b1 * (d - tau)))^2
+    return(c(f1, f2, f3, f4))
+  }
+}
+
 hb_mat <- function(d, c1, tau, b0, b1){
   if (d <= tau){
     f1 <- d^2 - tau * d
@@ -157,6 +198,33 @@ hb_tauoptimal <- function(d, loc){
   res
 }
 
+hb_tauoptimal_approx <- function(input, loc){
+  c1 <- loc[1]
+  tau <- loc[2]
+  b0 <- loc[3]
+  b1 <- loc[4]
+  n <- length(input)/2
+  pen = 999999999
+  
+  d <- input[1:n]
+  w <- input[(n+1):(2*n)]
+  
+  mat_list <- lapply(1:n, function(x) w[x] * hb_mat(d[x], c1, tau, b0, b1))
+  M <- Reduce("+", mat_list)
+  diag(M) <- diag(M) + 1e-10
+  b <- matrix(c(0, 1, 0, 0))
+  
+  if (rcond(M) < 2.220446e-16 || sum(w) > 1){
+    res = pen
+  } 
+  else{
+    M_inv <- solve(M)
+    res <- t(b) %*% M_inv %*% b
+  }
+  
+  res
+}
+
 # Find tau-optimal exact design for the Hunt-Bowman model
 hb_tauoptimal_pso <- function(nPoints, parms, psoinfo, upper){
   lb <- rep(0, nPoints)
@@ -219,6 +287,7 @@ hb_hoptimal <- function(d, loc){
   
   mat_list <- lapply(d, function(x) 1/n * hb_mat(x, c1, tau, b0, b1))
   M <- Reduce("+", mat_list)
+  diag(M) <- diag(M) + 1e-10
   h <- matrix(c(-tau, -c1, 0, 0))
   
   if (rcond(M) < 2.220446e-16){
@@ -234,10 +303,9 @@ hb_hoptimal <- function(d, loc){
 
 hb_hoptimal_approx <- function(input, loc){
   l <- length(input)
-  n <- ceiling(l/2)
+  n <- l/2
   d <- input[1:n]
-  w <- input[(n+1):l]
-  w[n] <- 1 - sum(w)
+  w <- input[(n+1):(2*n)]
   
   c1 <- loc[1]
   tau <- loc[2]
@@ -247,9 +315,10 @@ hb_hoptimal_approx <- function(input, loc){
   
   mat_list <- lapply(1:n, function(x) w[x] * hb_mat(d[x], c1, tau, b0, b1))
   M <- Reduce("+", mat_list)
+  diag(M) = diag(M) + 1e-10
   h <- matrix(c(-tau, -c1, 0, 0))
   
-  if (rcond(M) < 2.220446e-16 || w[n] < 0){
+  if (rcond(M) < 2.220446e-16 || sum(w) > 1){
     res = pen
   } 
   else{
@@ -274,14 +343,13 @@ hb_hoptimal_pso <- function(nPoints, parms, psoinfo, upper){
 
 # Find h-optimal approximate design for the Hunt-Bowman model
 hb_hoptimal_approx_pso <- function(nPoints, parms, upper){
-  psoinfo <- psoinfo_setting(nSwarms = 256, Iters = 3000)
-  lb <- rep(0, 2 * nPoints - 1)
-  ub <- c(rep(upper, nPoints), rep(1, nPoints - 1))
+  psoinfo <- psoinfo_setting(nSwarms =512, Iters = 5000)
+  lb <- rep(0, 2 * nPoints)
+  ub <- c(rep(upper, nPoints), rep(1, nPoints))
   
   pso_res <- globpso(objFunc = hb_hoptimal_approx, lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, loc = parms)
   
-  pso_res$par <- c(pso_res$par, 1 - sum(pso_res$par[(nPoints+1):(2*nPoints-1)]))
   pso_res$par <- pso_res$par |> round(4)
   pso_res
 }
@@ -297,13 +365,13 @@ hb_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
   pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hb_hoptimal_pso(nPoints, parms, psoinfo, upper))
   
   hb_list <- list(val = c(), design_points = c(), history = c(), 
-                  result = list(best_val = 0), 
-                  approximate_design = data.frame(support_points = approx_design$par[1:4], 
-                                                  weight = approx_design$par[5:8]))
+                  result = list(best_val = 0),
+                  approximate_design = data.frame(support_points = approx_design$par[1:4],
+                                                    weight = approx_design$par[5:8]))
   hb_list$approximate_design <- hb_list$approximate_design %>% arrange(support_points)
   idx0 <- print(match(0, hb_list$approximate_design$weight, -1))
   if (idx0 != -1) hb_list$approximate_design <- hb_list$approximate_design[-idx0, ]
-  
+
   if (nrow(hb_list$approximate_design) != length(unique(hb_list$approximate_design$support_points))){
     cnt <- hb_list$approximate_design |> count(support_points)
     ext <- cnt$support_points[which(cnt$n != 1)]
@@ -311,7 +379,7 @@ hb_hoptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
     w <- sum(hb_list$approximate_design$weight[apprep])
     hb_list$approximate_design <- hb_list$approximate_design[!apprep,]
     hb_list$approximate_design <- rbind(hb_list$approximate_design, c(ext, w))
-  }
+   }
   
   # Criterion value of each replication.
   hb_list$val <- sapply(1:nRep, function(x) pso_results[[x]]$val) 
@@ -362,17 +430,28 @@ exp_log_f <- function(d, c0, c1, b0, b1){
   f3 <- -exp(b0 - b1 * d) / (1 + exp(b0 - b1 * d))^2
   f4 <- d * exp(b0 - b1 * d) / (1 + exp(b0 - b1 * d))^2
   f <- matrix(c(f1, f2, f3, f4))
-  f %*% t(f)
+  f
+}
+
+exp_log_grad <- function(d, theta){
+  c0 = theta[1] 
+  c1 = theta[2] 
+  b0 = theta[3] 
+  b1 = theta[4]
+  
+  f1 <- exp(-c1 * d)
+  f2 <- -c0 * d * exp(-c1 * d)
+  f3 <- -exp(b0 - b1 * d) / (1 + exp(b0 - b1 * d))^2
+  f4 <- d * exp(b0 - b1 * d) / (1 + exp(b0 - b1 * d))^2
+  f <- c(f1, f2, f3, f4)
+  f
 }
 
 exp_log_mat <- function(d, c0, c1, b0, b1){
-  #d <- c(0, d)
   n <- length(d)
-  mat_list <- lapply(d, function(x) 1/n * exp_log_f(x, c0, c1, b0, b1))
+  mat_list <- lapply(d, function(x) 1/n * exp_log_f(x, c0, c1, b0, b1) %*% t(exp_log_f(x, c0, c1, b0, b1)))
   
-  #print(mat_list)
   M <- Reduce("+", mat_list)
-  diag(M) <- diag(M) + 1e-10
   M
 }
 
@@ -441,6 +520,16 @@ exp_log_doptimal_pso_rep <- function(nRep, nPoints = 4, parms, psoinfo, upper){
 
 
 ## exp-log model h-optimal
+exp_log_h <- function(d, c0, c1, b0, b1){
+  h1 <- -c1
+  h2 <- -c0
+  h3 <- b1 * exp(b0) * (1 - exp(b0)) / (exp(b0) + 1)^3
+  h4 <- exp(b0) / (exp(b0) + 1)^2 
+  h <- matrix(c(h1, h2, h3, h4))
+  
+  h
+}
+
 exp_log_hoptimal <- function(d, loc){
   c0 = loc[1]
   c1 = loc[2]
@@ -487,8 +576,9 @@ exp_log_hoptimal_approx <- function(input, loc){
   h4 <- exp(b0) / (exp(b0) + 1)^2 
   h <- matrix(c(h1, h2, h3, h4))
   
-  mat_list <- lapply(1:n, function(x) w[x] * exp_log_f(d[x], c0, c1, b0, b1))
+  mat_list <- lapply(1:n, function(x) w[x] * exp_log_mat(d[x], c0, c1, b0, b1))
   M <- Reduce("+", mat_list)
+  #print(M)
   
   if (rcond(M) < 2.220446e-16 || w[n] < 0){
     res = pen
@@ -596,6 +686,7 @@ exp_log_tauoptimal <- function(d, loc){
   b <- exp_log_b(tau, c0, c1, b0, b1)
   
   M <- exp_log_mat(d, c0, c1, b0, b1)
+  diag(M) <- diag(M) + 1e-10
   if (rcond(M) < 2.220446e-16){
     res = pen
   }
