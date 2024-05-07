@@ -122,7 +122,7 @@ hb_doptimal_approx <- function(dw, loc){
   w <- dw[(n+1):(2*n)]
   
   # Evaluate d-optimality criterion value
-  if (sum(w) >1) res <- pen
+  if (sum(w) > 1) res <- pen
   else {
     mat_list <- lapply(1:n, function(x) w[x] * hb_mat(d[x], c1, tau, b0, b1))
     inf_mat <- Reduce("+", mat_list)
@@ -237,7 +237,7 @@ hb_hoptimal_approx <- function(input, loc){
 ### exp-log model
 
 # exp-log model parameters
-exp_log_params <- function(c0, c1, b0, b1){
+el_params <- function(c0, c1, b0, b1){
   c(c0, c1, b0, b1)
 }
 
@@ -314,7 +314,7 @@ el_doptimal_approx <- function(input, loc){
   d <- input[1:n]
   w <- input[(n+1):(2*n)]
   
-  mat_list <- lapply(1:n, function(x) w[x] * exp_log_mat(d[x], c0, c1, b0, b1))
+  mat_list <- lapply(1:n, function(x) w[x] * exp_log_f(d[x], c0, c1, b0, b1) %*% t(exp_log_f(d[x], c0, c1, b0, b1)))
   M <- Reduce("+", mat_list)
   
   if(sum(w) > 1) res = pen
@@ -378,7 +378,7 @@ el_hoptimal_approx <- function(input, loc){
   h4 <- exp(b0) / (exp(b0) + 1)^2 
   h <- matrix(c(h1, h2, h3, h4))
   
-  mat_list <- lapply(1:n, function(x) w[x] * exp_log_mat(d[x], c0, c1, b0, b1))
+  mat_list <- lapply(1:n, function(x) w[x] * exp_log_f(d[x], c0, c1, b0, b1) %*% t(exp_log_f(d[x], c0, c1, b0, b1)))
   M <- Reduce("+", mat_list)
   
   if (rcond(M) < 2.220446e-16 || sum(w) > 1){
@@ -439,17 +439,17 @@ el_tauoptimal_approx <- function(input, loc){
   c1 = loc[2]
   b0 = loc[3]
   b1 = loc[4]
-  tau =loc[5]
+  tau = loc[5]
   pen = 9e+10
+  
+  n <- length(input)/2
   
   d <- input[1:n]
   w <- input[(n+1):(2*n)]
   
-  n <- length(d)
-  
   b <- exp_log_b(tau, c0, c1, b0, b1)
   
-  mat_list <- lapply(1:n, function(x) w[x] * exp_log_mat(d[x], c0, c1, b0, b1))
+  mat_list <- lapply(1:n, function(x) w[x] * exp_log_f(d[x], c0, c1, b0, b1) %*% t(exp_log_f(d[x], c0, c1, b0, b1)))
   M <- Reduce("+", mat_list)
   diag(M) <- diag(M) + 1e-10
   
@@ -499,7 +499,7 @@ logit_doptimal <- function(d, loc){
   -det(inf_mat) / n^2
 }
 
-logistic_doptimal_approx <- function(input, loc){
+logit_doptimal_approx <- function(input, loc){
   a <- loc[1]
   b <- loc[2]
   pen = 9e+10
@@ -706,18 +706,22 @@ hormesis_exact <- function(model, criterion, nPoints, parms, psoinfo, upper, low
 }
 
 hormesis_approx <- function(model, criterion, parms, psoinfo, upper, lower){
-  lb <- c(rep(lower, nDim), rep(0, nDim))
-  ub <- c(rep(upper, nDim), rep(1, nDim))
   
   if (model == "HuntBowman"){
     nDim = 4
     if (criterion == "D") obj <- hb_doptimal_approx
     else if (criterion == "tau") obj <- hb_tauoptimal_approx
     else if (criterion == "h") obj <- hb_hoptimal_approx
-  } else if (model == "ExpLog"){
+  } 
+  else if (model == "ExpLog"){
     nDim = 4
     if (criterion == "D") obj <- el_doptimal_approx
-    else if (criterion == "tau") obj <- el_tauoptimal_approx
+    else if (criterion == "tau"){
+      obj <- el_tauoptimal_approx
+      tau <- uniroot(tau_func, c(0.00001, 0.15), tol = 1e-10, 
+                     c0 = parms[1], c1 = parms[2], b0 = parms[3], b1 = parms[4])$root
+      parms <- c(parms, tau)
+    } 
     else if (criterion == "h") obj <- el_hoptimal_approx
   } 
   else if (model == "logistic"){
@@ -733,6 +737,9 @@ hormesis_approx <- function(model, criterion, parms, psoinfo, upper, lower){
     nDim = 5  
   } 
   
+  lb <- c(rep(lower, nDim), rep(0, nDim))
+  ub <- c(rep(upper, nDim), rep(1, nDim))
+  
   pso_res <- globpso(objFunc = obj, 
                      lower = lb, upper = ub, 
                      PSO_INFO = psoinfo, verbose = F, 
@@ -743,8 +750,9 @@ hormesis_approx <- function(model, criterion, parms, psoinfo, upper, lower){
   pso_res$approx$support <- pso_res$approx$support |> round(4)
   pso_res$approx$weight <- pso_res$approx$weight |> round(3)
   
-  idx0 <- match(0, pso_res$approx$weight, -1)
-  if(idx != -1) pso_res$approx <- pso_res$approx[-1, ]
+  idx0 <- which(pso_res$approx$weight == 0)
+  if(length(idx0) != 0) pso_res$approx <- pso_res$approx[-idx0, ]
+  
   
   if (nrow(pso_res$approx) != length(unique(pso_res$approx$support))){
     cnt <- pso_res$approx |> count(support)
@@ -758,13 +766,26 @@ hormesis_approx <- function(model, criterion, parms, psoinfo, upper, lower){
   pso_res
 }
 
-
-psoinfo <- psoinfo_setting()
-pso_test <- hormesis_exact(model = "HuntBowman", criterion = "D", nPoints = 8, parms = hb_par, 
-                         psoinfo = psoinfo, upper = 0.15, lower = 0)
-pso_test$exact
-
-psoinfo <- psoinfo_setting(256, 2000)
-pso_approx_test <- hormesis_approx(model = "HuntBowman", criterion = "tau", parms = hb_par, 
-                                       psoinfo = psoinfo, upper = 0.15, lower = 0)
-pso_approx_test$approx
+hormesis_pso <- function(model, criterion, parms, psoinfo, upper, lower, nPoints, nRep){
+  exact_results <- list()
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hormesis_exact(model = model, criterion = criterion, 
+                                                                               nPoints = nPoints, parms = parms, 
+                                                                               psoinfo = psoinfo, upper = upper, lower = lower))
+  val_list <- sapply(1:nRep, function(x) pso_results[[x]]$val)
+  best_idx <- which.min(val_list)
+  exact_design <- pso_results[[best_idx]]$exact
+  exact_val <- pso_results[[best_idx]]$val
+  
+  psoinfo_approx <- psoinfo_setting(256, 2000)
+  approx_result <- hormesis_approx(model = model, criterion = criterion, parms = parms, 
+                                   psoinfo = psoinfo_approx, upper = upper, lower = lower)
+  approx_design <- approx_result$approx
+  approx_val <- approx_result$val
+  
+  nDim <- length(parms)
+  if (criterion == "D") eff <- (exact_val/approx_val) ^ (1 / nDim)
+  else eff <- (approx_val / exact_val)
+  eff = round(eff, 4)
+  
+  list(exact_design = exact_design, approximate_design = approx_design, efficiency = eff)
+}
