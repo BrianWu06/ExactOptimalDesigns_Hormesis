@@ -117,12 +117,13 @@ hb_doptimal_approx <- function(dw, loc){
   b1 <- loc[4]
   pen = 9e+10
   
-  n <- length(dw)/2
+  n <- (length(dw)+1)/2
   d <- dw[1:n]
-  w <- dw[(n+1):(2*n)]
+  w <- dw[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   # Evaluate d-optimality criterion value
-  if (sum(w) > 1) res <- pen
+  if (w[n] < 0) res <- pen
   else {
     mat_list <- lapply(1:n, function(x) w[x] * hb_mat(d[x], c1, tau, b0, b1))
     inf_mat <- Reduce("+", mat_list)
@@ -161,18 +162,19 @@ hb_tauoptimal_approx <- function(input, loc){
   tau <- loc[2]
   b0 <- loc[3]
   b1 <- loc[4]
-  n <- length(input)/2
+  n <- (length(input)+1)/2
   pen = 9e+10
   
   d <- input[1:n]
-  w <- input[(n+1):(2*n)]
+  w <- input[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   mat_list <- lapply(1:n, function(x) w[x] * hb_mat(d[x], c1, tau, b0, b1))
   M <- Reduce("+", mat_list)
   diag(M) <- diag(M) + 1e-10
   b <- matrix(c(0, 1, 0, 0))
   
-  if (rcond(M) < 2.220446e-16 || sum(w) > 1){
+  if (rcond(M) < 2.220446e-16 || w[n] < 0){
     res = pen
   } 
   else{
@@ -212,18 +214,19 @@ hb_hoptimal_approx <- function(input, loc){
   tau <- loc[2]
   b0 <- loc[3]
   b1 <- loc[4]
-  n <- length(input)/2
+  n <- (length(input)+1)/2
   pen = 9e+10
   
   d <- input[1:n]
-  w <- input[(n+1):(2*n)]
+  w <- input[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   mat_list <- lapply(1:n, function(x) w[x] * hb_mat(d[x], c1, tau, b0, b1))
   M <- Reduce("+", mat_list)
   diag(M) <- diag(M) + 1e-10
   h <- matrix(c(-tau, -c1, 0, 0))
   
-  if (rcond(M) < 2.220446e-16 || sum(w) > 1){
+  if (rcond(M) < 2.220446e-16 || w[n] < 0){
     res = pen
   } 
   else{
@@ -237,7 +240,7 @@ hb_hoptimal_approx <- function(input, loc){
 ### exp-log model
 
 # exp-log model parameters
-el_params <- function(c0, c1, b0, b1){
+el_parms <- function(c0, c1, b0, b1){
   c(c0, c1, b0, b1)
 }
 
@@ -308,16 +311,17 @@ el_doptimal_approx <- function(input, loc){
   c1 = loc[2]
   b0 = loc[3]
   b1 = loc[4]
-  n <- length(input)/2
+  n <- (length(input)+1)/2
   pen = 9e+10
   
   d <- input[1:n]
-  w <- input[(n+1):(2*n)]
+  w <- input[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   mat_list <- lapply(1:n, function(x) w[x] * exp_log_f(d[x], c0, c1, b0, b1) %*% t(exp_log_f(d[x], c0, c1, b0, b1)))
   M <- Reduce("+", mat_list)
   
-  if(sum(w) > 1) res = pen
+  if(w[n] < 0) res = pen
   else res = -det(M)
   
   res
@@ -366,11 +370,12 @@ el_hoptimal_approx <- function(input, loc){
   c1 = loc[2]
   b0 = loc[3]
   b1 = loc[4]
-  n = length(input)/2
+  n = (length(input)+1)/2
   pen = 9e+10
   
   d <- input[1:n]
-  w <- input[(n+1):(2*n)]
+  w <- input[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   h1 <- -c1
   h2 <- -c0
@@ -381,7 +386,7 @@ el_hoptimal_approx <- function(input, loc){
   mat_list <- lapply(1:n, function(x) w[x] * exp_log_f(d[x], c0, c1, b0, b1) %*% t(exp_log_f(d[x], c0, c1, b0, b1)))
   M <- Reduce("+", mat_list)
   
-  if (rcond(M) < 2.220446e-16 || sum(w) > 1){
+  if (rcond(M) < 2.220446e-16 || w[n] < 0){
     res = pen
   }
   else {
@@ -442,10 +447,11 @@ el_tauoptimal_approx <- function(input, loc){
   tau = loc[5]
   pen = 9e+10
   
-  n <- length(input)/2
+  n <- (length(input)+1)/2
   
   d <- input[1:n]
-  w <- input[(n+1):(2*n)]
+  w <- input[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   b <- exp_log_b(tau, c0, c1, b0, b1)
   
@@ -453,7 +459,7 @@ el_tauoptimal_approx <- function(input, loc){
   M <- Reduce("+", mat_list)
   diag(M) <- diag(M) + 1e-10
   
-  if (rcond(M) < 2.220446e-16 || sum(w) > 1){
+  if (rcond(M) < 2.220446e-16 || w[n] < 0){
     res = pen
   }
   else {
@@ -465,7 +471,7 @@ el_tauoptimal_approx <- function(input, loc){
 }
 
 ## Simple logistic model D-optimal
-logistic_params <- function(alpha, beta){
+logistic_parms <- function(alpha, beta){
   c(alpha, beta)
 }
 
@@ -475,11 +481,9 @@ logistic <- function(d, alpha, beta){
 }
 
 # Dose-response plot for logistic models
-logistic_plot <- function(parms, bound){
+logistic_plot <- function(parms, lb, ub){
   alpha = parms[1]
   beta = parms[2]
-  lb = bound * -1
-  ub = bound
   
   fp <- seq(lb, ub, by = (ub - lb)/100)
   log_df <- data.frame(dose = fp, response = sapply(fp, function(x) logistic(x, alpha, beta)))
@@ -503,15 +507,16 @@ logit_doptimal_approx <- function(input, loc){
   a <- loc[1]
   b <- loc[2]
   pen = 9e+10
-  n <- length(input)/2
+  n <- (length(input)+1)/2
   
   d <- input[1:n]
-  w <- input[(n+1):(2*n)]
+  w <- input[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   theta <- a + b * d
   omega <- exp(theta) / (1 + exp(theta))^2
   
-  if(sum(w) > 1){
+  if(w[n] < 0){
     res = pen
   }
   else{
@@ -525,7 +530,7 @@ logit_doptimal_approx <- function(input, loc){
 }
 
 ## Quadratic logistic D-optimal
-qlogistic_params <- function(alpha, beta1, beta2){
+qlogistic_parms <- function(alpha, beta1, beta2){
   c(alpha, beta1, beta2)
 }
 
@@ -569,16 +574,17 @@ qlogit_doptimal_approx <- function(input, loc){
   a <- loc[1]
   b1 <- loc[2]
   b2 <- loc[3]
-  n <- length(input)/2
+  n <- (length(input)+1)/2
   pen <- 9e+10
   
   d <- input[1:n]
-  w <- input[(n+1):(2*n)]
+  w <- input[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   theta <- a + b1 * d + b2 * d^2
   omega <- exp(theta) / (1 + exp(theta))^2
   
-  if (sum(w) > 1) res = pen
+  if (w[n] < 0) res = pen
   else {
     M <- matrix(c(sum(w * omega), sum(w * d * omega), sum(w * d^2 * omega), 
                   sum(w * d * omega), sum(w * d^2 * omega), sum(w * d^3 * omega), 
@@ -591,7 +597,7 @@ qlogit_doptimal_approx <- function(input, loc){
 }
 
 ## Cubic logistic models
-clogistic_params <- function(alpha, beta1, beta2, beta3){
+clogistic_parms <- function(alpha, beta1, beta2, beta3){
   c(alpha, beta1, beta2, beta3)
 }
 
@@ -640,20 +646,21 @@ clogit_doptimal_approx <- function(input, loc){
   b2 <- loc[3]
   b3 <- loc[4]
   pen = 9e+10
-  n <- length(input)/2
+  n <- (length(input)+1)/2
   
   d <- input[1:n]
-  w <- input[(1+n):(2*n)]
+  w <- input[(n+1):(2*n-1)]
+  w[n] <- 1 - sum(w)
   
   theta <- a + b1 * d + b2 * d^2 + b3 * d^3
   omega <- exp(theta) / (1 + exp(theta))^2
   
-  if(sum(w) > 1) res = pen
+  if(w[n] < 0) res = pen
   else{
-    M <- matrix(c(sum(omega), sum(d * omega), sum(d^2 * omega), sum(d^3 * omega), 
-                  sum(d * omega), sum(d^2 * omega), sum(d^3 * omega),  sum(d^4 * omega), 
-                  sum(d^2 * omega), sum(d^3 * omega), sum(d^4 * omega), sum(d^5 * omega), 
-                  sum(d^3 * omega), sum(d^4 * omega), sum(d^5 * omega), sum(d^6 * omega)), 
+    M <- matrix(c(sum(w * omega), sum(w * d * omega), sum(w * d^2 * omega), sum(w * d^3 * omega), 
+                  sum(w * d * omega), sum(w * d^2 * omega), sum(w * d^3 * omega),  sum(w * d^4 * omega), 
+                  sum(w * d^2 * omega), sum(w * d^3 * omega), sum(w * d^4 * omega), sum(w * d^5 * omega), 
+                  sum(w * d^3 * omega), sum(w * d^4 * omega), sum(w * d^5 * omega), sum(w * d^6 * omega)), 
                 nrow = 4)
     res = -det(M)
   }
@@ -670,122 +677,231 @@ psoinfo_setting <- function(nSwarms = 64, Iters = 1000){
 }
 
 # PSO for exact design
-hormesis_exact <- function(model, criterion, nPoints, parms, psoinfo, upper, lower){
-  
-  # set the lower and upper bounds for PSO
-  lb <- rep(lower, nPoints)
-  ub <- rep(upper, nPoints)
-  
-  if (model == "HuntBowman"){
-    if (criterion == "D") obj <- hb_doptimal
-    else if (criterion == "tau") obj <- hb_tauoptimal
-    else if (criterion == "h") obj <- hb_hoptimal
-  } else if (model == "ExpLog"){
-    if (criterion == "D") obj <- el_doptimal
-    else if (criterion == "tau"){
-      obj <- el_tauoptimal
-      tau <- uniroot(tau_func, c(0.00001, 0.15), tol = 1e-10, 
-                     c0 = parms[1], c1 = parms[2], b0 = parms[3], b1 = parms[4])$root
-      parms <- c(parms, tau)
-    } 
-    else if (criterion == "h") obj <- el_hoptimal
-  } 
-  else if (model == "logistic") obj <- logit_doptimal
-  else if (model == "qlogistic") obj <- qlogit_doptimal
-  else if (model == "clogistic") obj <- clogit_doptimal
-  
-  
-  pso_res <- globpso(objFunc = obj, 
-                     lower = lb, upper = ub, 
-                     PSO_INFO = psoinfo, verbose = F, 
-                     loc = parms)
-  
-  pso_res$exact <- pso_res$par |> round(4) |> table() |> data.frame()
-  colnames(pso_res$exact) <- c("Support", "N")
-  pso_res
-}
 
-hormesis_approx <- function(model, criterion, parms, psoinfo, upper, lower){
-  
+hormesis_pso <- function(model, criterion, parms, upper, lower, nPoints, nRep = 1, psoinfo_exact, psoinfo_approx){
+  start_time <- Sys.time()
   if (model == "HuntBowman"){
     nDim = 4
-    if (criterion == "D") obj <- hb_doptimal_approx
-    else if (criterion == "tau") obj <- hb_tauoptimal_approx
-    else if (criterion == "h") obj <- hb_hoptimal_approx
+    if (criterion == "D"){
+      obj_exact <- hb_doptimal
+      obj_approx <- hb_doptimal_approx
+    } 
+    else if(criterion == "tau"){
+      obj_exact <- hb_tauoptimal
+      obj_approx <- hb_tauoptimal_approx
+      nDim = 2
+    } 
+    else if (criterion == "h"){
+      obj_exact <- hb_hoptimal
+      obj_approx <- hb_hoptimal_approx
+    } 
   } 
   else if (model == "ExpLog"){
     nDim = 4
-    if (criterion == "D") obj <- el_doptimal_approx
+    if (criterion == "D"){
+      obj_approx <- el_doptimal_approx
+      obj_exact <- el_doptimal
+    } 
     else if (criterion == "tau"){
-      obj <- el_tauoptimal_approx
+      obj_approx <- el_tauoptimal_approx
+      obj_exact <- el_tauoptimal
       tau <- uniroot(tau_func, c(0.00001, 0.15), tol = 1e-10, 
                      c0 = parms[1], c1 = parms[2], b0 = parms[3], b1 = parms[4])$root
       parms <- c(parms, tau)
+      nDim = 2
     } 
-    else if (criterion == "h") obj <- el_hoptimal_approx
+    else if (criterion == "h"){
+      obj_approx <- el_hoptimal_approx
+      obj_exact <- el_hoptimal
+    } 
   } 
   else if (model == "logistic"){
-    obj <- logit_doptimal_approx
+    obj_approx <- logit_doptimal_approx
+    obj_exact <- logit_doptimal
     nDim = 2
   } 
   else if (model == "qlogistic"){
-    obj <- qlogit_doptimal_approx
+    obj_approx <- qlogit_doptimal_approx
+    obj_exact <- qlogit_doptimal
     nDim = 4
   } 
   else if (model == "clogistic"){
-    obj <- clogit_doptimal_approx
+    obj_approx <- clogit_doptimal_approx
+    obj_exact <- clogit_doptimal
+    nDim = 5  
+  } 
+   
+  #psoinfo_approx <- psoinfo_setting(256, 2000)
+  approx_lb <- c(rep(lower, nDim), rep(0, nDim-1))
+  approx_ub <- c(rep(upper, nDim), rep(1, nDim-1))
+  approx_result <- globpso(objFunc = obj_approx, lower = approx_lb, upper = approx_ub, PSO_INFO = psoinfo_approx, 
+                           loc = parms, verbose = T)
+  #print(approx_result$par)
+  approx_d <- approx_result$par[1:nDim] |> round(4)
+  approx_w <- approx_result$par[(nDim+1):(2*nDim-1)] |> round(3)
+  approx_w <- c(approx_w, 1 - sum(approx_w))
+  approx_design <- data.frame(support = approx_d, weight = approx_w)
+  approx_design <- approx_design[order(approx_design$support),] 
+  approx_val <- approx_result$val
+  
+  idx0 <- which(approx_design$weight == 0)
+  if(length(idx0) != 0) approx_design <- approx_design[-idx0, ]
+  
+  if (nrow(approx_design) != length(unique(approx_design$support))){
+    cnt <- approx_design |> count(support)
+    ext <- cnt$support[which(cnt$n != 1)]
+    apprep <- approx_design$support == ext
+    w <- sum(approx_design$weight[apprep])
+    approx_design <- approx_design[!apprep,]
+    approx_design <- rbind(approx_design, c(ext, w))
+  }
+  
+  effr <- efficient.rounding(approx_design$weight, nPoints)
+  mu_pso <- lapply(1:length(effr), function(x) rep(approx_design$support[x], effr[x])) |> unlist()
+  mvnorm_sd = (upper - lower)/4
+  nswarm <- psoinfo_exact$nSwarm/2
+  mvnorm_pso <- mvrnorm(n = (nswarm-1), mu = mu_pso, Sigma = diag(nPoints) * mvnorm_sd)
+  mvnorm_pso[mvnorm_pso < 0] <- 0
+  mvnorm_pso[mvnorm_pso > 0.15] <- 0.15
+  mvnorm_pso <- rbind(mvnorm_pso, mu_pso)
+  
+  pso_results <- list()
+  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- globpso(objFunc = obj_exact, lower = rep(lower, nPoints), 
+                                                                        upper = rep(upper, nPoints), init = mvnorm_pso, 
+                                                                        PSO_INFO = psoinfo_exact, loc = parms, verbose = T))
+  val_list <- sapply(1:nRep, function(x) pso_results[[x]]$val)
+  best_idx <- which.min(val_list)
+  exact_design <- pso_results[[best_idx]]$par |> round(4) |> table() |> data.frame()
+  colnames(exact_design) <- c("Support", "N")
+  exact_val <- pso_results[[best_idx]]$val
+  
+  # pso_mvnorm <- globpso(objFunc = obj_exact, lower = rep(lower, nPoints), upper = rep(upper, nPoints), 
+  #                       init = mvnorm_pso, PSO_INFO = psoinfo, loc = parms, verbose = F)
+  # exact_design <- pso_mvnorm$par |> round(4) |> table() |> data.frame()
+  # colnames(exact_design) <- c("Support", "N")
+  # exact_val <- pso_mvnorm$val
+  
+  nEff <- length(parms)
+  if (criterion == "D") eff <- (exact_val/approx_val) ^ (1 / nEff)
+  else eff <- (approx_val / exact_val)
+  eff = round(eff, 4)
+  end_time <- Sys.time()
+  
+  result <- list(approx_design = approx_design, exact_design = exact_design, 
+                 efficiency = eff, runtime = end_time - start_time)
+  result
+}
+
+hormesis_de <- function(model, criterion, parms, upper, lower, nPoints, nRep = 1, deinfo_exact, deinfo_approx){
+  start_time <- Sys.time()
+  if (model == "HuntBowman"){
+    nDim = 4
+    if (criterion == "D"){
+      obj_exact <- hb_doptimal
+      obj_approx <- hb_doptimal_approx
+    } 
+    else if(criterion == "tau"){
+      obj_exact <- hb_tauoptimal
+      obj_approx <- hb_tauoptimal_approx
+      nDim = 2
+    } 
+    else if (criterion == "h"){
+      obj_exact <- hb_hoptimal
+      obj_approx <- hb_hoptimal_approx
+    } 
+  } 
+  else if (model == "ExpLog"){
+    nDim = 4
+    if (criterion == "D"){
+      obj_approx <- el_doptimal_approx
+      obj_exact <- el_doptimal
+    } 
+    else if (criterion == "tau"){
+      obj_approx <- el_tauoptimal_approx
+      obj_exact <- el_tauoptimal
+      tau <- uniroot(tau_func, c(0.00001, 0.15), tol = 1e-10, 
+                     c0 = parms[1], c1 = parms[2], b0 = parms[3], b1 = parms[4])$root
+      parms <- c(parms, tau)
+      nDim = 2
+    } 
+    else if (criterion == "h"){
+      obj_approx <- el_hoptimal_approx
+      obj_exact <- el_hoptimal
+    } 
+  } 
+  else if (model == "logistic"){
+    obj_approx <- logit_doptimal_approx
+    obj_exact <- logit_doptimal
+    nDim = 2
+  } 
+  else if (model == "qlogistic"){
+    obj_approx <- qlogit_doptimal_approx
+    obj_exact <- qlogit_doptimal
+    nDim = 4
+  } 
+  else if (model == "clogistic"){
+    obj_approx <- clogit_doptimal_approx
+    obj_exact <- clogit_doptimal
     nDim = 5  
   } 
   
-  lb <- c(rep(lower, nDim), rep(0, nDim))
-  ub <- c(rep(upper, nDim), rep(1, nDim))
-  
-  pso_res <- globpso(objFunc = obj, 
-                     lower = lb, upper = ub, 
-                     PSO_INFO = psoinfo, verbose = F, 
-                     loc = parms)
-  
-  pso_res$approx <- data.frame(support = pso_res$par[1:nDim], weight = pso_res$par[(nDim+1):(2*nDim)]) |> 
-    arrange(support)
-  pso_res$approx$support <- pso_res$approx$support |> round(4)
-  pso_res$approx$weight <- pso_res$approx$weight |> round(3)
-  
-  idx0 <- which(pso_res$approx$weight == 0)
-  if(length(idx0) != 0) pso_res$approx <- pso_res$approx[-idx0, ]
-  
-  
-  if (nrow(pso_res$approx) != length(unique(pso_res$approx$support))){
-    cnt <- pso_res$approx |> count(support)
-    ext <- cnt$support[which(cnt$n != 1)]
-    apprep <- pso_res$approx$support == ext
-    w <- sum(pso_res$approx$weight[apprep])
-    pso_res$approx <- pso_res$approx[!apprep,]
-    pso_res$approx <- rbind(pso_res$approx, c(ext, w))
-  }
-  
-  pso_res
-}
-
-hormesis_pso <- function(model, criterion, parms, psoinfo, upper, lower, nPoints, nRep){
-  exact_results <- list()
-  pso_results <- lapply(1:nRep, function(x) pso_results[[x]] <- hormesis_exact(model = model, criterion = criterion, 
-                                                                               nPoints = nPoints, parms = parms, 
-                                                                               psoinfo = psoinfo, upper = upper, lower = lower))
-  val_list <- sapply(1:nRep, function(x) pso_results[[x]]$val)
-  best_idx <- which.min(val_list)
-  exact_design <- pso_results[[best_idx]]$exact
-  exact_val <- pso_results[[best_idx]]$val
-  
-  psoinfo_approx <- psoinfo_setting(256, 2000)
-  approx_result <- hormesis_approx(model = model, criterion = criterion, parms = parms, 
-                                   psoinfo = psoinfo_approx, upper = upper, lower = lower)
-  approx_design <- approx_result$approx
+  #psoinfo_approx <- psoinfo_setting(256, 2000)
+  approx_lb <- c(rep(lower, nDim), rep(0, nDim-1))
+  approx_ub <- c(rep(upper, nDim), rep(1, nDim-1))
+  approx_result <- diffevo(objFunc = obj_approx, lower = approx_lb, upper = approx_ub, DE_INFO = deinfo_approx, 
+                           loc = parms, verbose = T)
+  #print(approx_result$par)
+  approx_d <- approx_result$par[1:nDim] |> round(4)
+  approx_w <- approx_result$par[(nDim+1):(2*nDim-1)] |> round(3)
+  approx_w <- c(approx_w, 1 - sum(approx_w))
+  approx_design <- data.frame(support = approx_d, weight = approx_w)
+  approx_design <- approx_design[order(approx_design$support),] 
   approx_val <- approx_result$val
   
-  nDim <- length(parms)
-  if (criterion == "D") eff <- (exact_val/approx_val) ^ (1 / nDim)
+  idx0 <- which(approx_design$weight == 0)
+  if(length(idx0) != 0) approx_design <- approx_design[-idx0, ]
+  
+  if (nrow(approx_design) != length(unique(approx_design$support))){
+    cnt <- approx_design |> count(support)
+    ext <- cnt$support[which(cnt$n != 1)]
+    apprep <- approx_design$support == ext
+    w <- sum(approx_design$weight[apprep])
+    approx_design <- approx_design[!apprep,]
+    approx_design <- rbind(approx_design, c(ext, w))
+  }
+  
+  effr <- efficient.rounding(approx_design$weight, nPoints)
+  mu_de <- lapply(1:length(effr), function(x) rep(approx_design$support[x], effr[x])) |> unlist()
+  mvnorm_sd = (upper - lower)/4
+  nswarm <- deinfo_exact$nPop/2
+  mvnorm_de <- mvrnorm(n = (nswarm-1), mu = mu_de, Sigma = diag(nPoints) * mvnorm_sd)
+  mvnorm_de[mvnorm_de < lower] <- lower
+  mvnorm_de[mvnorm_de > upper] <- upper
+  mvnorm_de <- rbind(mvnorm_de, mu_de)
+  
+  de_results <- list()
+  de_results <- lapply(1:nRep, function(x) de_results[[x]] <- diffevo(objFunc = obj_exact, lower = rep(lower, nPoints), 
+                                                                        upper = rep(upper, nPoints), init = mvnorm_de, 
+                                                                        DE_INFO = deinfo_exact, loc = parms, verbose = T))
+  val_list <- sapply(1:nRep, function(x) de_results[[x]]$val)
+  best_idx <- which.min(val_list)
+  exact_design <- de_results[[best_idx]]$par |> round(4) |> table() |> data.frame()
+  colnames(exact_design) <- c("Support", "N")
+  exact_val <- de_results[[best_idx]]$val
+  
+  # pso_mvnorm <- globpso(objFunc = obj_exact, lower = rep(lower, nPoints), upper = rep(upper, nPoints), 
+  #                       init = mvnorm_pso, PSO_INFO = psoinfo, loc = parms, verbose = F)
+  # exact_design <- pso_mvnorm$par |> round(4) |> table() |> data.frame()
+  # colnames(exact_design) <- c("Support", "N")
+  # exact_val <- pso_mvnorm$val
+  
+  nEff <- length(parms)
+  if (criterion == "D") eff <- (exact_val/approx_val) ^ (1 / nEff)
   else eff <- (approx_val / exact_val)
   eff = round(eff, 4)
+  end_time <- Sys.time()
   
-  list(exact_design = exact_design, approximate_design = approx_design, efficiency = eff)
+  result <- list(approx_design = approx_design, exact_design = exact_design, 
+                 efficiency = eff, runtime = end_time - start_time)
+  result
 }
