@@ -23,11 +23,9 @@ The following R code (main.R) is an example of how to use the source code for th
     library(dplyr)
     library(ggplot2)
     library(MASS)
+    library(AlgDesign)
     source("EODH.R")
     
-    
-    # Set the number of particles and iterations for PSO
-    psoinfo <- psoinfo_setting(nSwarms = 64, Iters = 1000)
     
     # Run the hormesis_pso for searching the optimal exact designs
     # model options: "HuntBowman", "ExpLog", "Logistic", "qlogistic", "clogistic"
@@ -39,34 +37,52 @@ The following R code (main.R) is an example of how to use the source code for th
     # lower: Lower bound of the design space
     # nRep: Number of reruns for PSO to search the optimal exact design
     
-    # An example of searching the D-optimal exact design for the Hunt-Bowman model for N = 10.
+    # Set the number of particles and iterations for PSO
+    psoinfo_exact <- psoinfo_setting(32, 500)
+    psoinfo_approx <- psoinfo_setting(64, 1000)
+    
+    # An example of searching the D-optimal exact design by PSO for the Hunt-Bowman model for N = 10.
     hb_par <- hb_parms(c1 = 170, tau = 0.04, b0 = 1.46, b1 = 40)
     hb_res <- hormesis_pso(model = "HuntBowman", criterion = "D", nPoints = 10, parms = hb_par, 
-                             psoinfo = psoinfo, upper = 0.15, lower = 0, nRep = 5)
+                           psoinfo_exact = psoinfo_exact, psoinfo_approx = psoinfo_approx, 
+                           upper = 0.15, lower = 0, nRep = 5)
     hb_res
     
     # Another example of searching the h-optimal exact design for the Exp-Log model for N = 10.
     el_par <- el_parms(c0 = 0.15, c1 = 89, b0 = 3.2, b1 = 41)
     el_res <- hormesis_pso(model = "ExpLog", criterion = "h", nPoints = 10, parms = el_par, 
-                                 psoinfo = psoinfo, upper = 0.15, lower = 0, nRep = 5)
+                           psoinfo_exact = psoinfo_exact, psoinfo_approx = psoinfo_approx,
+                           upper = 0.15, lower = 0, nRep = 5)
     el_res
     
     # Examples of searching the D-optimal exact design for the logistic models for N = 10.
     # Logistic model
-    log_par <- logistic_params(alpha = 2, beta = 1)
+    log_par <- logistic_parms(alpha = 2, beta = 1)
     log_res <- hormesis_pso(model = "logistic", criterion = "D", nPoints = 10, parms = log_par, 
-                            psoinfo = psoinfo, upper = 5, lower = -5, nRep = 5)
+                            psoinfo_exact = psoinfo_exact, psoinfo_approx = psoinfo_approx,
+                            upper = 5, lower = -5, nRep = 5)
     log_res
     
     # Quadratic logistic model
-    qlog_par <- qlogistic_params(alpha = 3, beta1 = 0, beta2 = -1)
+    qlog_par <- qlogistic_parms(alpha = 3, beta1 = 0, beta2 = -1)
     qlog_res <- hormesis_pso(model = "qlogistic", criterion = "D", nPoints = 10, parms = qlog_par, 
-                             psoinfo = psoinfo, upper = 5, lower = -5, nRep = 5)
+                             psoinfo_exact = psoinfo_exact, psoinfo_approx = psoinfo_approx,
+                             upper = 5, lower = -5, nRep = 5)
     qlog_res
     
     # Cubic logistic model
-    clog_par <- clogistic_params(alpha = 1, beta1 = 3, beta2 = 2, beta3 = -1)
+    clog_par <- clogistic_parms(alpha = 1, beta1 = 3, beta2 = 2, beta3 = -1)
     clog_res <- hormesis_pso(model = "clogistic", criterion = "D", nPoints = 10, parms = clog_par, 
-                             psoinfo = psoinfo, upper = 5, lower = -5, nRep = 5)
+                             psoinfo_exact = psoinfo_exact, psoinfo_approx = psoinfo_approx,
+                             upper = 5, lower = -5, nRep = 5)
     clog_res
     
+    
+    # An example of searching the D-optimal exact design by DE for the Hunt-Bowman model for N = 10. 
+    deinfo_exact <- getDEInfo(nPop = 32, maxIter = 500, deType = "rand-to-best-1")
+    deinfo_approx <- getDEInfo(nPop = 64, maxIter = 1000, deType = "rand-to-best-1")
+    
+    hb_de_res <- hormesis_de(model = "HuntBowman", criterion = "D", nPoints = 10, parms = hb_par, 
+                             deinfo_exact = deinfo_exact, deinfo_approx = deinfo_approx, 
+                             upper = 0.15, lower = 0, nRep = 5)
+        
