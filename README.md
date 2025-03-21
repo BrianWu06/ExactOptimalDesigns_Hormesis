@@ -54,11 +54,11 @@ The following R code (main.R) is an example of how to use the source code for th
                            upper = 0.15, lower = 0, nRep = 1)
     el_res
         
-        # An example of searching the D-optimal exact design by DE for the Hunt-Bowman model for N = 10. 
-        deinfo_exact <- getDEInfo(nPop = 32, maxIter = 500, deType = "rand-to-best-1")
-        deinfo_approx <- getDEInfo(nPop = 64, maxIter = 1000, deType = "rand-to-best-1")
+    # An example of searching the D-optimal exact design by DE for the Hunt-Bowman model for N = 10. 
+    deinfo_exact <- getDEInfo(nPop = 32, maxIter = 500, deType = "rand-to-best-1")
+    deinfo_approx <- getDEInfo(nPop = 64, maxIter = 1000, deType = "rand-to-best-1")
         
-        hb_de_res <- hormesis_de(model = "HuntBowman", criterion = "D", nPoints = 10, parms = hb_par, 
-                                 deinfo_exact = deinfo_exact, deinfo_approx = deinfo_approx, 
-                                 upper = 0.15, lower = 0, nRep = 5)
+    hb_de_res <- hormesis_de(model = "HuntBowman", criterion = "D", nPoints = 10, parms = hb_par, 
+                            deinfo_exact = deinfo_exact, deinfo_approx = deinfo_approx, 
+                            upper = 0.15, lower = 0, nRep = 5)
             
