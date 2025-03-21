@@ -4,7 +4,6 @@ library(globpso)
 library(waiter)
 library(dplyr)
 library(ggplot2)
-library(AlgDesign)
 library(MASS)
 library(shinyjs)
 
@@ -2075,6 +2074,45 @@ eltau_get <- function(x, parms, M_inv){
   (t(fx) %*% M_inv %*% b)^2 - t(b) %*% M_inv %*% b
 }
 
+# modified efficient rounding
+eff_round_modified <- function (prop, n) 
+{
+  l <- length(prop)
+  n <- as.integer(n)
+  if (n < l) 
+    n <- l
+  if (any(prop < 0)) 
+    stop("Negative weights are not allowed")
+  if (abs(sum(prop) - 1) > 1e-12) 
+    stop("proportions must sum to unity")
+  ni <- ceiling(prop * (n - l/2))
+  N <- sum(ni)
+  while (N != n) {
+    if (N < n) {
+      m <- ni/prop
+      ee <- min(m)
+    }
+    else {
+      m <- (ni - 1)/prop
+      ee <- max(m)
+    }
+    
+    i <- which(abs(ee - m) < 1e-08)
+    if (N < n) {
+      maxni <- max(ni[i])
+      maxi <- i[which(ni[i] == maxni)[1]]
+      ni[maxi] <- ni[maxi] + 1
+    }
+    else {
+      maxni <- max(ni[i])
+      maxi <- i[which(ni[i] == maxni)[1]]
+      ni[maxi] <- ni[maxi] - 1
+    }
+    N <- sum(ni)
+  }
+  ni
+}
+
 ### PSO function
 
 ## Initalize PSO settings
@@ -2148,7 +2186,7 @@ hormesis_pso <- function(model, criterion, parms, upper, lower, nPoints, nRep = 
     approx_design <- rbind(approx_design, c(ext, w))
   }
   
-  effr <- efficient.rounding(approx_w, nPoints)
+  effr <- eff_round_modified(approx_w, nPoints)
   mu_pso <- lapply(1:length(effr), function(x) rep(approx_d[x], effr[x])) |> unlist()
   mvnorm_sd = (upper - lower)/4
   nswarm <- psoinfo_exact$nSwarm/2
@@ -2270,7 +2308,7 @@ eff_round <- function(approx, model, criterion, parms, nPoints){
   approx_w1 <- approx_w[-length(approx_w)]
   
   if(sum(approx_w) != 1) print(approx_w)
-  round_n <- efficient.rounding(approx_w, nPoints)
+  round_n <- eff_round_modified(approx_w, nPoints)
   eff_design <- data.frame(Support = approx_d, N = round_n)
   eff_d <- lapply(1:length(approx_d), function(x) rep(eff_design$Support[x], eff_design$N[x])) |> unlist()
   
@@ -2358,7 +2396,7 @@ pso_exact <- function(approx, model, criterion, parms, upper, lower, psoinfo_exa
   approx_w1 <- approx_w[-length(approx_w)]
   approx_val <- approx$val
   
-  effr <- efficient.rounding(approx_w, nPoints)
+  effr <- eff_round_modified(approx_w, nPoints)
   mu_pso <- lapply(1:length(effr), function(x) rep(approx_d[x], effr[x])) |> unlist()
   mvnorm_sd = (upper - lower)/4
   nswarm <- psoinfo_exact$nSwarm/2

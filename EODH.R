@@ -668,6 +668,46 @@ clogit_doptimal_approx <- function(input, loc){
   res
 }
 
+# modified efficient rounding
+eff_round_modified <- function (prop, n) 
+{
+  l <- length(prop)
+  n <- as.integer(n)
+  if (n < l) 
+    n <- l
+  if (any(prop < 0)) 
+    stop("Negative weights are not allowed")
+  if (abs(sum(prop) - 1) > 1e-12) 
+    stop("proportions must sum to unity")
+  ni <- ceiling(prop * (n - l/2))
+  N <- sum(ni)
+  while (N != n) {
+    if (N < n) {
+      m <- ni/prop
+      ee <- min(m)
+    }
+    else {
+      m <- (ni - 1)/prop
+      ee <- max(m)
+    }
+    
+    i <- which(abs(ee - m) < 1e-08)
+    if (N < n) {
+      maxni <- max(ni[i])
+      maxi <- i[which(ni[i] == maxni)[1]]
+      ni[maxi] <- ni[maxi] + 1
+    }
+    else {
+      maxni <- max(ni[i])
+      maxi <- i[which(ni[i] == maxni)[1]]
+      ni[maxi] <- ni[maxi] - 1
+    }
+    N <- sum(ni)
+  }
+  ni
+}
+
+
 ### PSO function
 
 ## Initalize PSO settings
@@ -736,11 +776,11 @@ hormesis_pso <- function(model, criterion, parms, upper, lower, nPoints, nRep = 
   approx_ub <- c(rep(upper, nDim), rep(1, nDim-1))
   approx_result <- globpso(objFunc = obj_approx, lower = approx_lb, upper = approx_ub, PSO_INFO = psoinfo_approx, 
                            loc = parms, verbose = T)
-  #print(approx_result$par)
-  approx_d <- approx_result$par[1:nDim] |> round(4)
-  approx_w <- approx_result$par[(nDim+1):(2*nDim-1)] |> round(3)
+  #print(approx_result$val)
+  approx_d <- approx_result$par[1:nDim]
+  approx_w <- approx_result$par[(nDim+1):(2*nDim-1)]
   approx_w <- c(approx_w, 1 - sum(approx_w))
-  approx_design <- data.frame(support = approx_d, weight = approx_w)
+  approx_design <- data.frame(support = round(approx_d, 4), weight = round(approx_w, 3))
   approx_design <- approx_design[order(approx_design$support),] 
   approx_val <- approx_result$val
   
@@ -756,8 +796,8 @@ hormesis_pso <- function(model, criterion, parms, upper, lower, nPoints, nRep = 
     approx_design <- rbind(approx_design, c(ext, w))
   }
   
-  effr <- efficient.rounding(approx_design$weight, nPoints)
-  mu_pso <- lapply(1:length(effr), function(x) rep(approx_design$support[x], effr[x])) |> unlist()
+  effr <- eff_round_modified(approx_w, nPoints)
+  mu_pso <- lapply(1:length(effr), function(x) rep(approx_d[x], effr[x])) |> unlist()
   mvnorm_sd = (upper - lower)/4
   nswarm <- psoinfo_exact$nSwarm/2
   mvnorm_pso <- mvrnorm(n = (nswarm-1), mu = mu_pso, Sigma = diag(nPoints) * mvnorm_sd)
@@ -870,7 +910,7 @@ hormesis_de <- function(model, criterion, parms, upper, lower, nPoints, nRep = 1
     approx_design <- rbind(approx_design, c(ext, w))
   }
   
-  effr <- efficient.rounding(approx_design$weight, nPoints)
+  effr <- eff_round_modified(approx_design$weight, nPoints)
   mu_de <- lapply(1:length(effr), function(x) rep(approx_design$support[x], effr[x])) |> unlist()
   mvnorm_sd = (upper - lower)/4
   nswarm <- deinfo_exact$nPop/2
