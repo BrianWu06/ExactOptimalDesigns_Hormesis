@@ -1,4 +1,4 @@
-# Optimal experimental design strategies for detecting hormesis
+# Optimal experimental designs for big and small experiments in toxicology with applications to studying hormesis via metaheuristics
 This repository contains the sources code of the app [Optimal experimental design strategies for detecting hormesis](https://brianwu.shinyapps.io/hormesis_ed_pso/).
 
 The source code is written in the R programming language. Users are required to download the package [globpso](https://github.com/willgertsch/SingleObjApp/blob/main/app.R).
@@ -8,9 +8,9 @@ The package can be downloaded by the following code.
     devtools::install_github("PingYangChen/globpso")
 
 In our app, we only allow users to search for up to 15 number of design points for all 5 optimal exact design problems mentioned in our paper to avoid exhausting the avaiable computing resource on the server. 
-Hence, we suggest useres to adjust and run the codes on their own device for larger number of design points.
+Hence, we suggest useres to adjust and run the codes on their own device for a larger number of design points.
 
-For more details of the background knowledge of our works, please refer to the user manual page of our [app](https://brianwu.shinyapps.io/hormesis_ed_pso/). 
+For more details of the background knowledge of our work, please refer to the user manual page of our [app](https://brianwu.shinyapps.io/hormesis_ed_pso/) or our paper [paper](https://www.sciencedirect.com/science/article/abs/pii/S2468111325000052?via%3Dihub)
 
 The following R code (main.R) is an example of how to use the source code for the desired optimal exact designs. 
 
@@ -61,4 +61,5 @@ The following R code (main.R) is an example of how to use the source code for th
     hb_de_res <- hormesis_de(model = "HuntBowman", criterion = "D", nPoints = 10, parms = hb_par, 
                             deinfo_exact = deinfo_exact, deinfo_approx = deinfo_approx, 
                             upper = 0.15, lower = 0, nRep = 5)
-            
+
+If you encounter any bugs or have suggestions when using our app or source code, please contact [brianwu0623@gmail.com](brianwu0623@gmail.com). Thank you.
